@@ -1,6 +1,6 @@
 # This file is the pytorch implementation of https://github.com/duanyq14/DAML/blob/master/lib/models/modified_googlenet.py
 
-from models.google_net import GoogLeNet
+from models.google_net import *
 import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
