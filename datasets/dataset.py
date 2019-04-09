@@ -107,8 +107,8 @@ class MyData(data.Dataset):
 
 
  #Example of using this class
- # data = CUB_200_2011()
- # train_loader = orch.utils.data.DataLoader(
+ # data = CUB_200_2011(root = path_of_my_data)
+ # train_loader = torch.utils.data.DataLoader(
 #         data.train, batch_size=batch_size,
 #         sampler=some_sampler,
 #         drop_last=True, pin_memory=True, num_workers=nThreads)
@@ -132,7 +132,7 @@ class CUB_200_2011:
         self.test = MyData(root, label_txt=test_txt, transform=transform_Dict['center-crop'])
 
  #Example of using this class
-# data = Car196()
+# data = Car196(root = path_of_my_data)
 # train_loader = torch.utils.data.DataLoader(
 #         data.train, batch_size=batch_size,
 #         sampler=some_sampler,
