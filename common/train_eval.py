@@ -96,9 +96,9 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
 		if nmi > best_nmi_1:
 			best_nmi_1 = nmi
 			best_f1_1 = f1
-			torch.save(model, os.getcwd() + '/model.pt')
-			torch.save(model_gen, os.getcwd() + '/model_gen.pt')
-			torch.save(model_dis, os.getcwd() + '/model_dis.pt')
+			torch.save(model, os.path.dirname(os.getcwd()) + '/pretrained/model.pt')
+			torch.save(model_gen, os.path.dirname(os.getcwd()) + '/pretrained/model_gen.pt')
+			torch.save(model_dis, os.path.dirname(os.getcwd()) + '/pretrained/model_dis.pt')
 		if f1 > best_f1_2:
 			best_nmi_2 = nmi
 			best_f1_2 = f1
