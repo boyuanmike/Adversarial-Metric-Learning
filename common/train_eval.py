@@ -37,7 +37,7 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
 	p = utils.Logger(log_dir_path, **param_dict)
 
 	# load data base
-	if p.dataset is 'cars196':
+	if p.dataset is 'car196':
 		data = Car196(root = path)
 	else:
 		data = CUB_200_2011(root = path)
