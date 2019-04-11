@@ -7,6 +7,8 @@ from PIL import Image
 import os
 from collections import defaultdict
 from datasets import  transforms
+import numpy as np
+
 
 
 def default_loader(path):
@@ -95,12 +97,25 @@ class MyData(data.Dataset):
         self.loader = loader
 
     def __getitem__(self, index):
-        fn, label = self.images[index], self.labels[index]
-        fn = os.path.join(self.root, fn)
-        img = self.loader(fn)
-        if self.transform is not None:
-            img = self.transform(img)
-        return img, label
+        # fn, label = self.images[index], self.labels[index]
+        # fn = os.path.join(self.root, fn)
+        # img = self.loader(fn)
+        # if self.transform is not None:
+        #     img = self.transform(img)
+        # return img, label
+
+        target = self.labels[index]
+        same = []
+        diff = []
+        for l in self.labels:
+            if l == target:
+                same.append(l)
+            else:
+                diff.append(l)
+        p_idx = np.random.choice(same)
+        n_idx = np.random.choice(diff)
+        return self.images[index],self.images[p_idx],self.images[n_idx]
+
 
     def __len__(self):
         return len(self.images)
