@@ -54,11 +54,10 @@ def Generate_transform_Dict(origin_width=256, width=224, ratio=0.16):
 
 class MyData(data.Dataset):
     def __init__(self, root, label_txt=None,
-                 transform=None, loader=default_loader):
+                 transform=None, loader=default_loader,triplet=True):
 
 
         self.root = root
-
         #default behavior
         if label_txt is None:
             label_txt = os.path.join(root, 'train.txt')
@@ -95,26 +94,35 @@ class MyData(data.Dataset):
         self.transform = transform
         self.Index = Index
         self.loader = loader
+        self.triplet = triplet
 
     def __getitem__(self, index):
-        # fn, label = self.images[index], self.labels[index]
-        # fn = os.path.join(self.root, fn)
-        # img = self.loader(fn)
-        # if self.transform is not None:
-        #     img = self.transform(img)
-        # return img, label
+        if self.triplet == False:
+            fn, label = self.images[index], self.labels[index]
+            fn = os.path.join(self.root, fn)
+            img = self.loader(fn)
+            if self.transform is not None:
+                img = self.transform(img)
+            return img, label
+        else:
+            target_class = self.labels[index]
 
-        target = self.labels[index]
-        same = []
-        diff = []
-        for l in self.labels:
-            if l == target:
-                same.append(l)
-            else:
-                diff.append(l)
-        p_idx = np.random.choice(same)
-        n_idx = np.random.choice(diff)
-        return self.images[index],self.images[p_idx],self.images[n_idx]
+            #pool to choose n_idx
+            pool = self.classes
+            pool.remove(target_class)
+            n_class = np.random.choice(pool)
+            pool.append(target_class)
+            p_idx = np.random.choice(self.Index[target_class])
+            n_idx = np.random.choice(self.Index[n_class])
+            anchor_fn = os.path.join(self.root,self.images[index])
+            pos_fn = os.path.join(self.root, self.images[p_idx])
+            neg_fn = os.path.join(self.root, self.images[n_idx])
+            anchor_img = self.loader(anchor_fn)
+            pos_img = self.loader(pos_fn)
+            neg_img = self.loader(neg_fn)
+            if self.transform is not None:
+                return self.transform(anchor_img),self.transform(pos_img),self.transform(neg_img)
+            return anchor_img, pos_img, neg_img
 
 
     def __len__(self):
@@ -144,7 +152,7 @@ class CUB_200_2011:
         test_txt = os.path.join(root, 'test.txt')
 
         self.train = MyData(root, label_txt=train_txt, transform=transform_Dict['rand-crop'])
-        self.test = MyData(root, label_txt=test_txt, transform=transform_Dict['center-crop'])
+        self.test = MyData(root, label_txt=test_txt, transform=transform_Dict['center-crop'], triplet=False)
 
  #Example of using this class
 # data = Car196(root = path_of_my_data)
@@ -167,7 +175,7 @@ class Car196:
         train_txt = os.path.join(root, 'train.txt')
         test_txt = os.path.join(root, 'test.txt')
         self.train = MyData(root, label_txt=train_txt, transform=transform_Dict['rand-crop'])
-        self.test = MyData(root, label_txt=test_txt, transform=transform_Dict['center-crop'])
+        self.test = MyData(root, label_txt=test_txt, transform=transform_Dict['center-crop'],triplet=False)
 
 
 def testCar196():
