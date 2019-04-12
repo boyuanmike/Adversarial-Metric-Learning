@@ -6,8 +6,8 @@ import itertools
 import os
 import numpy as np
 import yaml
-from lib.functions.triplet_loss import triplet_loss as F_tloss
-from lib.common.evaluation import evaluate_cluster
+from functions.triplet_loss import triplet_loss as F_tloss
+from common.evaluation import evaluate_cluster
 
 import chainer
 import torch
