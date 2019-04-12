@@ -13,7 +13,6 @@ import chainer
 import torch
 import torch.nn.functional as F
 
-
 import copy
 import os
 
@@ -26,6 +25,7 @@ from chainer import Variable
 from tqdm import tqdm
 import random
 from sklearn.preprocessing import LabelEncoder
+
 
 def load_params(filename):
     with open(filename) as f:
@@ -51,7 +51,7 @@ def iter_combinatorial_pairs(queue, num_examples, batch_size, interval,
 
     if augment_positive:
         additional_positive_pairs = make_positive_pairs(
-             num_classes, num_examples_per_class, num_classes - 1)
+            num_classes, num_examples_per_class, num_classes - 1)
         pairs = np.concatenate((pairs, additional_positive_pairs))
 
     num_pairs = len(pairs)
@@ -70,8 +70,8 @@ def iter_combinatorial_pairs(queue, num_examples, batch_size, interval,
 
 class NPairMCIndexMaker(object):
     def __init__(self, batch_size, num_classes, num_per_class):
-        self.batch_size = batch_size        # number of examples in a batch
-        self.num_classes = num_classes      # number of classes
+        self.batch_size = batch_size  # number of examples in a batch
+        self.num_classes = num_classes  # number of classes
         self.num_per_class = num_per_class  # number of examples per class
 
     def get_epoch_indexes(self):
@@ -128,12 +128,12 @@ class Logger(defaultdict):
 
             if isinstance(value, (np.ndarray, list)):
                 np.save(os.path.join(dir_path, key + ".npy"), value)
-            elif isinstance(value, (chainer.Chain, chainer.ChainList)):
-                model_path = os.path.join(dir_path, "model.npz")
-                chainer.serializers.save_npz(model_path, value)
-            elif isinstance(value, chainer.Optimizer):
-                optimizer_path = os.path.join(dir_path, "optimizer.npz")
-                chainer.serializers.save_npz(optimizer_path, value)
+            # elif isinstance(value, (chainer.Chain, chainer.ChainList)):
+            #     model_path = os.path.join(dir_path, "model.npz")
+            #     chainer.serializers.save_npz(model_path, value)
+            # elif isinstance(value, chainer.Optimizer):
+            #     optimizer_path = os.path.join(dir_path, "optimizer.npz")
+            #     chainer.serializers.save_npz(optimizer_path, value)
             else:
                 others.append("{}: {}".format(key, value))
 
@@ -165,18 +165,18 @@ class LogUniformDistribution(object):
 
 
 def iterate_forward(model, dis_model, epoch_iterator, normalize=False, epoch=20):
-    #这是啥？？
-    #xp = model.xp
+    # 这是啥？？
+    # xp = model.xp
     y_batches = []
     c_batches = []
     for batch in tqdm(copy.copy(epoch_iterator)):
         x_batch_data, c_batch_data = batch
-        #x_batch = Variable(xp.asarray(x_batch_data))
+        # x_batch = Variable(xp.asarray(x_batch_data))
         x_batch = np.asarray(x_batch_data)
         x_batch = x_batch_data
         y_batch = model(x_batch)
 
-        #20是啥？？
+        # 20是啥？？
         if epoch >= 20:
             y_batch = dis_model(y_batch)
         if normalize:
@@ -191,6 +191,7 @@ def iterate_forward(model, dis_model, epoch_iterator, normalize=False, epoch=20)
     c_data = np.concatenate(c_batches)
     return y_data, c_data
 
+
 def compute_soft_hard_retrieval(distance_matrix, labels, label_batch=None):
     softs = []
     hards = []
@@ -198,9 +199,9 @@ def compute_soft_hard_retrieval(distance_matrix, labels, label_batch=None):
 
     if label_batch is None:
         label_batch = labels
-    #distance_matrix = cuda.to_cpu(distance_matrix)
-    #labels = cuda.to_cpu(labels)
-    #label_batch = cuda.to_cpu(label_batch)
+    # distance_matrix = cuda.to_cpu(distance_matrix)
+    # labels = cuda.to_cpu(labels)
+    # label_batch = cuda.to_cpu(label_batch)
 
     K = 11  # "K" for top-K
     for d_i, label_i in zip(distance_matrix, label_batch):
@@ -225,104 +226,114 @@ def compute_soft_hard_retrieval(distance_matrix, labels, label_batch=None):
     average_retrieval = np.array(retrievals).mean(axis=0)
     return average_soft, average_hard, average_retrieval
 
-def lossfun_one_batch(model, gen_model, dis_model, opt, fea_opt, opt_gen ,opt_dis, params, batch, epoch = 100):
+
+def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen, opt_dis, params, batch, epoch=100):
     # the first half of a batch are the anchors and the latters
     # are the positive examples corresponding to each anchor
     lambda1 = 1.0
     lambda2 = 1.0
-    if params.loss == "angular":
-        x_data, c_data = batch
-        x_data = model.xp.asarray(x_data)
-    
-        y = model(x_data)
-        y_a, y_p = F.split_axis(y, 2, axis=0)
-        return angular_mc_loss_m(y_a, y_p, params.tradeoff,params.alpha)
-    elif params.loss == "triplet":
-        x_data, c_data = batch
-        x_data = model.xp.asarray(x_data)
-        batch = model(x_data)
-        batchsize = len(batch)
-        a, p, n = F.split_axis(batch, 3, axis=0)
-        t_loss = F_tloss(a, p, n, params.alpha)
-        batch_concat = F.concat([a, p, n], axis = 1)
+    model.train()
+    model = model.to(device)
+    # if params.loss == "angular":
+    #     x_data, c_data = batch
+    #     x_data = model.xp.asarray(x_data)
+    #
+    #     y = model(x_data)
+    #     y_a, y_p = F.split_axis(y, 2, axis=0)
+    #     return angular_mc_loss_m(y_a, y_p, params.tradeoff, params.alpha)
+    if params.loss == "triplet":
+        anc, pos, neg = batch
+        anc = anc.to(device)
+        pos = pos.to(device)
+        neg = neg.to(device)
+        anc_out = model(anc)
+        pos_out = model(pos)
+        neg_out = model(neg)
+
+        t_loss = F_tloss(anc_out, pos_out, neg_out, params.alpha)
+        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
 
         fake = gen_model(batch_concat)
-        batch_fake = F.concat([a, p, fake], axis=0)
+        batch_fake = torch.cat((anc_out, pos_out, fake), dim=1)
         embedding_fake = dis_model(batch_fake)
 
-        loss_hard = l2_hard(batch_fake,batch)
-        loss_reg = l2_norm(batch_fake,batch)
+        loss_hard = l2_hard(batch_fake, batch)
+        loss_reg = l2_norm(batch_fake, batch)
         loss_adv = adv_loss(embedding_fake)
-        loss_gen = loss_hard + lambda1*loss_reg + lambda2*loss_adv
+        loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
         loss_m = triplet_loss(embedding_fake)
 
-        
         if epoch < 20:
             t_loss.backward()
-            fea_opt.update()
-        else:            
+            fea_opt.step()
+        else:
             loss_gen.backward()
             loss_m.backward()
-            opt.update()
-            opt_gen.update()
-            opt_dis.update()
-        model.cleargrads()
-        gen_model.cleargrads()
-        dis_model.cleargrads()
+            opt.step()
+            opt_gen.step()
+            opt_dis.step()
+        model.zero_grad()
+        gen_model.zero_grad()
+        dis_model.zero_grad()
 
-        chainer.reporter.report({'loss_gen': loss_gen})
-        chainer.reporter.report({'loss_dis': loss_m})
+        # chainer.reporter.report({'loss_gen': loss_gen})
+        # chainer.reporter.report({'loss_dis': loss_m})
         return loss_gen, loss_m
+
 
 def evaluate(model, dis_model, epoch_iterator, distance='euclidean', normalize=False,
              batch_size=10, return_distance_matrix=False, epoch=20):
     if distance not in ('cosine', 'euclidean'):
         raise ValueError("distance must be 'euclidean' or 'cosine'.")
-
-    #with chainer.no_backprop_mode():
+    model.eval()
+    # with chainer.no_backprop_mode():
     with torch.no_grad():
-        with model.eval():
-            y_data, c_data = iterate_forward(
-                    model, dis_model, epoch_iterator, normalize=normalize, epoch=epoch)
+        y_data, c_data = iterate_forward(
+            model, dis_model, epoch_iterator, normalize=normalize, epoch=epoch)
 
     add_epsilon = True
-    #xp = cuda.get_array_module(y_data)
+    # xp = cuda.get_array_module(y_data)
     num_examples = len(y_data)
-    print(y_data.shape,c_data.shape)
+    print(y_data.shape, c_data.shape)
     # why 98 clusters?
-    nmi, f1 = evaluate_cluster(y_data,c_data,98)
+    nmi, f1 = evaluate_cluster(y_data, c_data, 98)
     return nmi, f1
 
-def triplet_loss(y,alpha=1.0):
-    a, p, n= split_to_three(y)
 
-    distance = torch.sum((a - p) ** 2.0, dim = 1) - torch.sum((a - n) ** 2.0, dim = 1) +alpha
-    return torch.mean(F.relu(distance)) / 2
-
-def adv_loss(y,alpha=1.0):
+def triplet_loss(y, alpha=1.0):
     a, p, n = split_to_three(y)
-    distance = -torch.sum((a - p) ** 2.0, dim = 1) + torch.sum((a - n) ** 2.0, dim = 1) - alpha
+
+    distance = torch.sum((a - p) ** 2.0, dim=1) - torch.sum((a - n) ** 2.0, dim=1) + alpha
+    return torch.mean(F.relu(distance)) / 2
+
+
+def adv_loss(y, alpha=1.0):
+    a, p, n = split_to_three(y)
+    distance = -torch.sum((a - p) ** 2.0, dim=1) + torch.sum((a - n) ** 2.0, dim=1) - alpha
 
     return torch.mean(F.relu(distance)) / 2
 
-def l2_norm(fake,batch):
+
+def l2_norm(fake, batch):
     _, _, fake_n = split_to_three(fake)
     _, _, n = split_to_three(batch)
 
-    l2 = torch.sum((fake_n - n) ** 2.0, dim = 1) 
+    l2 = torch.sum((fake_n - n) ** 2.0, dim=1)
 
     return torch.mean(l2)
 
-def l2_hard(fake,batch):
-    _, _, fake_n= split_to_three(fake)
+
+def l2_hard(fake, batch):
+    _, _, fake_n = split_to_three(fake)
     a, _, _ = split_to_three(batch)
 
-    l2 = torch.sum((fake_n - a) ** 2.0, dim = 1) 
+    l2 = torch.sum((fake_n - a) ** 2.0, dim=1)
 
     return torch.mean(l2)
 
-def split_to_three(tensor):
-    #split along dim=0 into three pieces
+
+def split_to_three(y):
+    # split along dim=0 into three pieces
     d = y.shape[0]
-    a, p, n= torch.split(tensor, d//3, dim=0)
+    a, p, n = torch.split(y, d // 3, dim=0)
     return a, p, n
