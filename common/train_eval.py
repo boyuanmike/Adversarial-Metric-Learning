@@ -72,10 +72,10 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
 		t = tqdm(range(p.num_batches_per_epoch))
 		for i in t:
 			t.set_description(desc='# {}'.format(epoch))
-			model_optimizer.zero_grad()
-			gen_optimizer.zero_grad()
-			dis_optimizer.zero_grad()
-			model_feat_optimizer.zero_grad()
+#			model_optimizer.zero_grad()
+#			gen_optimizer.zero_grad()
+#			dis_optimizer.zero_grad()
+#			model_feat_optimizer.zero_grad()
 			loss_gen, loss_dis = func_train_one_batch(model, model_gen, model_dis, 
 				model_optimizer, model_feat_optimizer, gen_optimizer, dis_optimizer, p, next(train_it), 
 				epoch)
