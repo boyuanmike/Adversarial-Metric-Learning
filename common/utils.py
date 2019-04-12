@@ -233,7 +233,6 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
     lambda1 = 1.0
     lambda2 = 1.0
     model.train()
-    model = model.to(device)
     # if params.loss == "angular":
     #     x_data, c_data = batch
     #     x_data = model.xp.asarray(x_data)

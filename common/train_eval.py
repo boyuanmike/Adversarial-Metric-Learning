@@ -31,7 +31,7 @@ def get_optimizer(model):
 def train(main_script_path, func_train_one_batch, param_dict, savev_distance_matrix=False, path=None):
     script_filename = os.path.splitext(os.path.basename(main_script_path))[0]
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     config_parser = six.moves.configparser.ConfigParser()
     config_parser.read('config')
     log_dir_path = os.path.expanduser(config_parser.get('logs', 'dir_path'))
@@ -48,9 +48,9 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
     test_loader = torch.utils.data.DataLoader(data.test, batch_size=p.batch_size)
     # construct the model
 
-    model = ModifiedGoogLeNet(p.out_dim, p.normalize_output)
-    model_gen = Generator()
-    model_dis = Discriminator(512, 512)
+    model = ModifiedGoogLeNet(p.out_dim, p.normalize_output).to(device)
+    model_gen = Generator().to(device)
+    model_dis = Discriminator(512, 512).to(device)
 
     model_optimizer = get_optimizer(model)
     gen_optimizer = get_optimizer(model_gen)
@@ -78,7 +78,7 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
             #			gen_optimizer.zero_grad()
             #			dis_optimizer.zero_grad()
             #			model_feat_optimizer.zero_grad()
-            loss_gen, loss_dis = func_train_one_batch(model, model_gen, model_dis,
+            loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
                                                       model_optimizer, model_feat_optimizer, gen_optimizer,
                                                       dis_optimizer, p, next(train_it),
                                                       epoch)
@@ -99,9 +99,9 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
         if nmi > best_nmi_1:
             best_nmi_1 = nmi
             best_f1_1 = f1
-            torch.save(model, os.path.dirname(os.getcwd()) + '/pretrained/model.pt')
-            torch.save(model_gen, os.path.dirname(os.getcwd()) + '/pretrained/model_gen.pt')
-            torch.save(model_dis, os.path.dirname(os.getcwd()) + '/pretrained/model_dis.pt')
+            torch.save(model, "/data/models/model.pt")
+            torch.save(model_gen, '/data/models/model_gen.pt')
+            torch.save(model_dis, '/data/models/model_dis.pt')
         if f1 > best_f1_2:
             best_nmi_2 = nmi
             best_f1_2 = f1
