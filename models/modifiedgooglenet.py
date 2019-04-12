@@ -16,7 +16,7 @@ class ModifiedGoogLeNet(GoogLeNet):
 
         self.local_response_normal = nn.LocalResponseNorm(size=5, k=1, alpha=1e-4 / 5)
 
-        image_mean = np.array([123, 117, 104], dtype=np.float32)  # RGB
+        image_mean = torch.tensor([123.0, 117.0, 104.0])  # RGB
         self._image_mean = image_mean[None, :, None, None]
         self.normalize_output = normalize_output
 
@@ -29,7 +29,7 @@ class ModifiedGoogLeNet(GoogLeNet):
 
         h = F.relu(self.conv2(h))
         h = F.relu(self.conv3(h))
-        h = self.local_response_norm(h)
+        h = self.local_response_normal(h)
         h = F.max_pool2d(h, 3, 2)
 
         h = self.inception3a(h)
@@ -44,12 +44,14 @@ class ModifiedGoogLeNet(GoogLeNet):
         h = F.max_pool2d(h, 3, 2)
 
         h = self.inception5a(h)
-        h = self.inception5b(h)
-        h = F.avg_pool2d(h, 7, 1)
+        h = self.inception5b(h)  # [120, 1024, 6, 6]
+
+        h = F.adaptive_avg_pool2d(h, 1)
+        # h = F.avg_pool2d(h, 7, 1)
 
         h = self.bn_fc(h)
-        y = self.fc(h)
+        y = self.fc(h.reshape(*h.size()[:2]))
         if self.normalize_output:
-            y = torch.norm(y, p=2, dim=1)
-
+            y_norm = torch.norm(y, p=2, dim=1, keepdim=True)
+            y = y / y_norm.expand_as(y)
         return y

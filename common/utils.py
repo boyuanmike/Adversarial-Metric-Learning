@@ -9,7 +9,7 @@ import yaml
 from functions.triplet_loss import triplet_loss as F_tloss
 from common.evaluation import evaluate_cluster
 
-import chainer
+# import chainer
 import torch
 import torch.nn.functional as F
 
@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 import six
 import time
 
-from chainer import cuda
-from chainer import Variable
+# from chainer import cuda
+# from chainer import Variable
 from tqdm import tqdm
 import random
 from sklearn.preprocessing import LabelEncoder
@@ -164,31 +164,36 @@ class LogUniformDistribution(object):
         return np.exp(uniform(np.log(self.low), np.log(self.high), size))
 
 
-def iterate_forward(model, dis_model, epoch_iterator, normalize=False, epoch=20):
+def iterate_forward(device, model, dis_model, test_loader, normalize=False, epoch=20):
     # 这是啥？？
     # xp = model.xp
     y_batches = []
     c_batches = []
-    for batch in tqdm(copy.copy(epoch_iterator)):
-        x_batch_data, c_batch_data = batch
+    for anchors, labels in tqdm(test_loader):
+        # x_batch_data, c_batch_data = batch
         # x_batch = Variable(xp.asarray(x_batch_data))
-        x_batch = np.asarray(x_batch_data)
-        x_batch = x_batch_data
-        y_batch = model(x_batch)
+        # x_batch = np.asarray(x_batch_data)
+        # x_batch = x_batch_data
+        # y_batch = model(x_batch)
+        anchors = anchors.to(device)
+        labels = labels.to(device)
+        y_batch = model(anchors)
 
         # 20是啥？？
         if epoch >= 20:
             y_batch = dis_model(y_batch)
         if normalize:
-            y_batch_data = y_batch / np.linalg.norm(
-                y_batch, axis=1, keepdims=True)
+            y_norm = torch.norm(y_batch, p=2, dim=1, keepdim=True)
+            y_norm = y_norm.expand_as(y_batch)
+            y_batch_data = y_batch / y_norm
         else:
             y_batch_data = y_batch
         y_batches.append(y_batch_data)
-        y_batch = None
-        c_batches.append(c_batch_data)
-    y_data = np.concatenate(y_batches)
-    c_data = np.concatenate(c_batches)
+        # y_batch = None
+        c_batches.append(labels)
+
+    y_data = torch.cat(tuple(y_batches), dim=0)
+    c_data = torch.cat(tuple(c_batches), dim=0)
     return y_data, c_data
 
 
@@ -245,19 +250,24 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         anc = anc.to(device)
         pos = pos.to(device)
         neg = neg.to(device)
-        anc_out = model(anc)
-        pos_out = model(pos)
-        neg_out = model(neg)
+        anc_out = model(anc)  # (N, 512)
+        pos_out = model(pos)  # (N, 512)
+        neg_out = model(neg)  # (N, 512)
 
-        t_loss = F_tloss(anc_out, pos_out, neg_out, params.alpha)
+        t_loss = F_tloss(anc_out.clone(), pos_out.clone(), neg_out.clone(), params.alpha)
+
+        # anc_out = anc_out.detach()
+        # pos_out = pos_out.detach()
+        # neg_out = neg_out.detach()
+
         batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
 
-        fake = gen_model(batch_concat)
-        batch_fake = torch.cat((anc_out, pos_out, fake), dim=1)
-        embedding_fake = dis_model(batch_fake)
+        fake = gen_model(batch_concat)  # (N, 512)
+        batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
+        embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
 
-        loss_hard = l2_hard(batch_fake, batch)
-        loss_reg = l2_norm(batch_fake, batch)
+        loss_hard = l2_hard(batch_fake, anc_out)  # batch -> anc_out
+        loss_reg = l2_norm(batch_fake, neg_out)  # batch -> neg_out
         loss_adv = adv_loss(embedding_fake)
         loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
         loss_m = triplet_loss(embedding_fake)
@@ -280,7 +290,7 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         return loss_gen, loss_m
 
 
-def evaluate(model, dis_model, epoch_iterator, distance='euclidean', normalize=False,
+def evaluate(device, model, dis_model, test_loader, distance='euclidean', normalize=False,
              batch_size=10, return_distance_matrix=False, epoch=20):
     if distance not in ('cosine', 'euclidean'):
         raise ValueError("distance must be 'euclidean' or 'cosine'.")
@@ -288,7 +298,7 @@ def evaluate(model, dis_model, epoch_iterator, distance='euclidean', normalize=F
     # with chainer.no_backprop_mode():
     with torch.no_grad():
         y_data, c_data = iterate_forward(
-            model, dis_model, epoch_iterator, normalize=normalize, epoch=epoch)
+            model, dis_model, test_loader, normalize=normalize, epoch=epoch)
 
     add_epsilon = True
     # xp = cuda.get_array_module(y_data)
@@ -313,26 +323,20 @@ def adv_loss(y, alpha=1.0):
     return torch.mean(F.relu(distance)) / 2
 
 
-def l2_norm(fake, batch):
+def l2_norm(fake, neg_out):
     _, _, fake_n = split_to_three(fake)
-    _, _, n = split_to_three(batch)
-
-    l2 = torch.sum((fake_n - n) ** 2.0, dim=1)
-
+    l2 = torch.sum((fake_n - neg_out) ** 2.0, dim=1)
     return torch.mean(l2)
 
 
-def l2_hard(fake, batch):
+def l2_hard(fake, anc_out):
     _, _, fake_n = split_to_three(fake)
-    a, _, _ = split_to_three(batch)
-
-    l2 = torch.sum((fake_n - a) ** 2.0, dim=1)
-
+    l2 = torch.sum((fake_n - anc_out) ** 2.0, dim=1)  # a -> anc_out
     return torch.mean(l2)
 
 
-def split_to_three(y):
+def split_to_three(y, dim=0):
     # split along dim=0 into three pieces
-    d = y.shape[0]
-    a, p, n = torch.split(y, d // 3, dim=0)
+    d = y.size(dim)
+    a, p, n = torch.split(y, d // 3, dim=dim)
     return a, p, n

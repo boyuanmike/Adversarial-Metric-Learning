@@ -6,8 +6,7 @@ import torch
 import torch.nn.functional as F
 
 
-
-def triplet_loss(a,p,n,alpha=1.0):
+def triplet_loss(a, p, n, alpha=1.0):
     """Lifted struct loss function.
 
     Args:
@@ -25,6 +24,7 @@ def triplet_loss(a,p,n,alpha=1.0):
         Song_Deep_Metric_Learning_CVPR_2016_paper.pdf>`_
 
     """
-    
-    distance = torch.sum((a - p) ** 2.0, dim = 1) - torch.sum((a - n) ** 2.0, dim = 1) +alpha
-    return torch.mean(F.relu(distance)) / 2
+
+    distance = torch.clamp(torch.sum((a - p) ** 2.0, dim=1)
+                           - torch.sum((a - n) ** 2.0, dim=1) + alpha, min=0)
+    return torch.mean(distance) / 2

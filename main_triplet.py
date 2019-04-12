@@ -7,11 +7,13 @@ import numpy as np
 from common.utils import (UniformDistribution,
                           LogUniformDistribution, load_params, lossfun_one_batch)
 from common.train_eval import train
-
+import torch
 colorama.init()
 
 
 def main():
+    if torch.cuda.is_available():
+        torch.set_default_tensor_type(torch.cuda.FloatTensor)
     random_state = None
     num_runs = 100
     save_distance_matrix = False
@@ -21,7 +23,7 @@ def main():
     static_params = dict(
         num_epochs=100,
         num_batches_per_epoch=60,
-        batch_size=120,
+        batch_size=32,
         out_dim=512,
         crop_size=224,
         normalize_output=True,

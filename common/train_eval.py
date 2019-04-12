@@ -34,7 +34,7 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     config_parser = six.moves.configparser.ConfigParser()
     config_parser.read('config')
-    log_dir_path = os.path.expanduser(config_parser.get('logs', 'dir_path'))
+    log_dir_path = "/data/logs/"
 
     p = Logger(log_dir_path, **param_dict)
 
@@ -50,7 +50,7 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
 
     model = ModifiedGoogLeNet(p.out_dim, p.normalize_output).to(device)
     model_gen = Generator().to(device)
-    model_dis = Discriminator(512, 512).to(device)
+    model_dis = Discriminator(p.out_dim, p.out_dim).to(device)
 
     model_optimizer = get_optimizer(model)
     gen_optimizer = get_optimizer(model_gen)
@@ -93,9 +93,8 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
         hard = [0]
         retrieval = [0]
 
-        nmi, f1 = evaluate(
-            model, model_dis, iter(test_loader), p.distance_type,
-            return_distance_matrix=savev_distance_matrix, epoch=epoch)
+        nmi, f1 = evaluate(device, model, model_dis, test_loader, p.distance_type,
+                           return_distance_matrix=savev_distance_matrix, epoch=epoch)
         if nmi > best_nmi_1:
             best_nmi_1 = nmi
             best_f1_1 = f1
