@@ -45,7 +45,7 @@ def main():
         params.update(static_params)
 
         stop = train(__file__, lossfun_one_batch,
-                     params, save_distance_matrix, '/data/car196')
+                     params, save_distance_matrix, '/disk-main/car196')
 
 
 if __name__ == '__main__':

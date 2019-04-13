@@ -34,7 +34,7 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     config_parser = six.moves.configparser.ConfigParser()
     config_parser.read('config')
-    log_dir_path = "/data/logs/"
+    log_dir_path = "/disk-main/logs/"
 
     p = Logger(log_dir_path, **param_dict)
 
@@ -44,7 +44,7 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
     else:
         data = CUB_200_2011(root=path)
     train_loader = torch.utils.data.DataLoader(data.train, batch_size=p.batch_size)
-    train_it = iter(train_loader)
+    # train_it = iter(train_loader)
     test_loader = torch.utils.data.DataLoader(data.test, batch_size=p.batch_size)
     # construct the model
 
@@ -70,17 +70,14 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
         time_begin = time.time()
         epoch_loss_gen = []
         epoch_loss_dis = []
-        loss = 0
-        t = tqdm(range(p.num_batches_per_epoch))
-        for i in t:
-            t.set_description(desc='# {}'.format(epoch))
-            #			model_optimizer.zero_grad()
-            #			gen_optimizer.zero_grad()
-            #			dis_optimizer.zero_grad()
-            #			model_feat_optimizer.zero_grad()
+        # loss = 0
+        # t = tqdm(range(p.num_batches_per_epoch))
+        # for i in t:
+        #     t.set_description(desc='# {}'.format(epoch))
+        for batch in tqdm(train_loader, desc='# {}'.format(epoch)):
             loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
                                                       model_optimizer, model_feat_optimizer, gen_optimizer,
-                                                      dis_optimizer, p, next(train_it),
+                                                      dis_optimizer, p, batch,
                                                       epoch)
             epoch_loss_gen.append(loss_gen.item())
             epoch_loss_dis.append(loss_dis.item())
@@ -98,9 +95,9 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
         if nmi > best_nmi_1:
             best_nmi_1 = nmi
             best_f1_1 = f1
-            torch.save(model, "/data/models/model.pt")
-            torch.save(model_gen, '/data/models/model_gen.pt')
-            torch.save(model_dis, '/data/models/model_dis.pt')
+            torch.save(model, "/disk-main/models/model.pt")
+            torch.save(model_gen, '/disk-main/models/model_gen.pt')
+            torch.save(model_dis, '/disk-main/models/model_dis.pt')
         if f1 > best_f1_2:
             best_nmi_2 = nmi
             best_f1_2 = f1

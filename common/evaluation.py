@@ -48,7 +48,8 @@ def compute_cluster_metric(labels, labels_pre):
     values = range(nums_item)
     item_map = dict()
     for i in range(nums_item):
-        item_map.update([keys[i], values[i]])
+        item_map[keys[i]] = values[i]
+        # item_map.update([keys[i], values[i]])
 
     # count the number
     count_item = np.zeros(nums_item)

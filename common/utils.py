@@ -192,8 +192,8 @@ def iterate_forward(device, model, dis_model, test_loader, normalize=False, epoc
         # y_batch = None
         c_batches.append(labels)
 
-    y_data = torch.cat(tuple(y_batches), dim=0)
-    c_data = torch.cat(tuple(c_batches), dim=0)
+    y_data = torch.cat(tuple(y_batches), dim=0).cpu().numpy()
+    c_data = torch.cat(tuple(c_batches), dim=0).cpu().numpy()
     return y_data, c_data
 
 
@@ -232,7 +232,7 @@ def compute_soft_hard_retrieval(distance_matrix, labels, label_batch=None):
     return average_soft, average_hard, average_retrieval
 
 
-def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen, opt_dis, params, batch, epoch=100):
+def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen, opt_dis, params, batch, epoch=20):
     # the first half of a batch are the anchors and the latters
     # are the positive examples corresponding to each anchor
     lambda1 = 1.0
@@ -254,12 +254,27 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         pos_out = model(pos)  # (N, 512)
         neg_out = model(neg)  # (N, 512)
 
-        t_loss = F_tloss(anc_out.clone(), pos_out.clone(), neg_out.clone(), params.alpha)
+        t_loss = F_tloss(anc_out, pos_out, neg_out, params.alpha)
 
-        # anc_out = anc_out.detach()
-        # pos_out = pos_out.detach()
-        # neg_out = neg_out.detach()
+        # Train model and dis_model
+        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
+        fake = gen_model(batch_concat).detach()  # (N, 512)
+        batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
+        embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
+        loss_m = triplet_loss(embedding_fake)
 
+        if epoch < 20:
+            t_loss.backward()
+            fea_opt.step()
+        else:
+            loss_m.backward()
+            opt.step()
+            opt_dis.step()
+
+        # train gen_model
+        anc_out = anc_out.detach()
+        pos_out = pos_out.detach()
+        neg_out = neg_out.detach()
         batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
 
         fake = gen_model(batch_concat)  # (N, 512)
@@ -270,17 +285,11 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         loss_reg = l2_norm(batch_fake, neg_out)  # batch -> neg_out
         loss_adv = adv_loss(embedding_fake)
         loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
-        loss_m = triplet_loss(embedding_fake)
 
-        if epoch < 20:
-            t_loss.backward()
-            fea_opt.step()
-        else:
+        if epoch >= 20:
             loss_gen.backward()
-            loss_m.backward()
-            opt.step()
             opt_gen.step()
-            opt_dis.step()
+
         model.zero_grad()
         gen_model.zero_grad()
         dis_model.zero_grad()
@@ -297,8 +306,9 @@ def evaluate(device, model, dis_model, test_loader, distance='euclidean', normal
     model.eval()
     # with chainer.no_backprop_mode():
     with torch.no_grad():
-        y_data, c_data = iterate_forward(
-            model, dis_model, test_loader, normalize=normalize, epoch=epoch)
+        y_data, c_data = iterate_forward(device,
+                                         model, dis_model, test_loader,
+                                         normalize=normalize, epoch=epoch)
 
     add_epsilon = True
     # xp = cuda.get_array_module(y_data)
