@@ -80,8 +80,8 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
 		#     t.set_description(desc='# {}'.format(epoch))
 		for batch in tqdm(train_loader, desc='# {}'.format(epoch)):
 			loss_gen, loss_dis = func_train_one_batch(device, model, model_pos_gen, model_neg_gen, model_dis,
-													  model_optimizer, model_feat_optimizer, pos_gen_optimizer,
-													  neg_gen_optimizer, dis_optimizer, p, batch, epoch)
+				model_optimizer, model_feat_optimizer, pos_gen_optimizer,
+				neg_gen_optimizer, dis_optimizer, p, batch, epoch)
 			epoch_loss_gen.append(loss_gen.item())
 			epoch_loss_dis.append(loss_dis.item())
 
