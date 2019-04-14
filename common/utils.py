@@ -232,12 +232,18 @@ def compute_soft_hard_retrieval(distance_matrix, labels, label_batch=None):
     return average_soft, average_hard, average_retrieval
 
 
-def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen, opt_dis, params, batch, epoch=5):
+def lossfun_one_batch(device, model, model_pos_gen, model_neg_gen, dis_model, opt, fea_opt, opt_gen, neg_gen, opt_dis, params, batch, epoch=5):
+
     # the first half of a batch are the anchors and the latters
     # are the positive examples corresponding to each anchor
     lambda1 = 1.0
     lambda2 = 1.0
     model.train()
+    opt.zero_grad()
+    fea_opt.zero_grad()
+    opt_gen.zero_grad()
+    neg_gen.zero_grad()
+    opt_dis.zero_grad()
     # if params.loss == "angular":
     #     x_data, c_data = batch
     #     x_data = model.xp.asarray(x_data)
@@ -257,50 +263,47 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
 
         t_loss = F_tloss(anc_out, pos_out, neg_out, params.alpha)
 
-        # Train model and dis_model
+        # pos gen
         batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
-        fake = gen_model(batch_concat).detach()  # (N, 512)
-        batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
+        g_pos = model_pos_gen(batch_concat)
+        loss_hard_pos = l2(g_pos, anc_out)
+        loss_reg_pos = l2(g_pos, pos_out)
+        loss_gen_pos = loss_hard_pos + lambda1 * loss_reg_pos
+
+        #neg gen
+        batch_concat_g = torch.cat((anc_out, g_pos, neg_out), dim=1)
+        fake = model_neg_gen(batch_concat_g)  # (N, 512)
+        loss_hard = l2(fake, anc_out)
+        loss_reg = l2(fake, neg_out)  # batch -> neg_out
+
+
+        batch_fake = torch.cat((anc_out, g_pos, fake), dim=0)
+        #pos_out or g_pos?
         embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
+        loss_adv = adv_loss(embedding_fake)
+        
+        loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
+
         loss_m = triplet_loss(embedding_fake)
 
         if epoch < 5:
             t_loss.backward()
             fea_opt.step()
         else:
+            loss_gen_pos.backward()
+            loss_gen.backward()
             loss_m.backward()
             opt.step()
             opt_dis.step()
-
-        # train gen_model
-        anc_out = anc_out.detach()
-        pos_out = pos_out.detach()
-        neg_out = neg_out.detach()
-        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
-
-        fake = gen_model(batch_concat)  # (N, 512)
-        batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
-        embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
-
-        loss_hard = l2_hard(batch_fake, anc_out)  # batch -> anc_out
-        loss_reg = l2_norm(batch_fake, neg_out)  # batch -> neg_out
-        loss_adv = adv_loss(embedding_fake)
-        loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
-
-        if epoch >= 5:
-            loss_gen.backward()
+            neg_gen.step()
             opt_gen.step()
-
-        model.zero_grad()
-        gen_model.zero_grad()
-        dis_model.zero_grad()
 
         # neg_grad = mu * neg_grad + neg_grad / torch.norm(neg_grad, p=1)
         # neg = neg + epsilon * torch.sign(neg_grad)
 
         # chainer.reporter.report({'loss_gen': loss_gen})
         # chainer.reporter.report({'loss_dis': loss_m})
-        return loss_gen, loss_m
+        return loss_gen_pos, loss_gen, loss_m
 
 
 def evaluate(device, model, dis_model, test_loader, distance='euclidean', normalize=False,
@@ -346,6 +349,10 @@ def l2_norm(fake, neg_out):
 def l2_hard(fake, anc_out):
     _, _, fake_n = split_to_three(fake)
     l2 = torch.sum((fake_n - anc_out) ** 2.0, dim=1)  # a -> anc_out
+    return torch.mean(l2)
+
+def l2(a, b):
+    l2 = torch.sum((a - c) ** 2.0, dim=1)
     return torch.mean(l2)
 
 
