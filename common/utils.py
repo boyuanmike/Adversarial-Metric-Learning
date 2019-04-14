@@ -164,7 +164,7 @@ class LogUniformDistribution(object):
         return np.exp(uniform(np.log(self.low), np.log(self.high), size))
 
 
-def iterate_forward(device, model, dis_model, test_loader, normalize=False, epoch=20):
+def iterate_forward(device, model, dis_model, test_loader, normalize=False, epoch=5):
     # 这是啥？？
     # xp = model.xp
     y_batches = []
@@ -180,7 +180,7 @@ def iterate_forward(device, model, dis_model, test_loader, normalize=False, epoc
         y_batch = model(anchors)
 
         # 20是啥？？
-        if epoch >= 20:
+        if epoch >= 5:
             y_batch = dis_model(y_batch)
         if normalize:
             y_norm = torch.norm(y_batch, p=2, dim=1, keepdim=True)
@@ -232,7 +232,7 @@ def compute_soft_hard_retrieval(distance_matrix, labels, label_batch=None):
     return average_soft, average_hard, average_retrieval
 
 
-def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen, opt_dis, params, batch, epoch=20):
+def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen, opt_dis, params, batch, epoch=5):
     # the first half of a batch are the anchors and the latters
     # are the positive examples corresponding to each anchor
     lambda1 = 1.0
@@ -250,6 +250,7 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         anc = anc.to(device)
         pos = pos.to(device)
         neg = neg.to(device)
+
         anc_out = model(anc)  # (N, 512)
         pos_out = model(pos)  # (N, 512)
         neg_out = model(neg)  # (N, 512)
@@ -263,7 +264,7 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
         loss_m = triplet_loss(embedding_fake)
 
-        if epoch < 20:
+        if epoch < 5:
             t_loss.backward()
             fea_opt.step()
         else:
@@ -286,7 +287,7 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         loss_adv = adv_loss(embedding_fake)
         loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
 
-        if epoch >= 20:
+        if epoch >= 5:
             loss_gen.backward()
             opt_gen.step()
 
@@ -294,13 +295,16 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         gen_model.zero_grad()
         dis_model.zero_grad()
 
+        # neg_grad = mu * neg_grad + neg_grad / torch.norm(neg_grad, p=1)
+        # neg = neg + epsilon * torch.sign(neg_grad)
+
         # chainer.reporter.report({'loss_gen': loss_gen})
         # chainer.reporter.report({'loss_dis': loss_m})
         return loss_gen, loss_m
 
 
 def evaluate(device, model, dis_model, test_loader, distance='euclidean', normalize=False,
-             batch_size=10, return_distance_matrix=False, epoch=20):
+             batch_size=10, return_distance_matrix=False, epoch=5):
     if distance not in ('cosine', 'euclidean'):
         raise ValueError("distance must be 'euclidean' or 'cosine'.")
     model.eval()

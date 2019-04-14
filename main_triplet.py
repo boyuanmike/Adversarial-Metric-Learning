@@ -12,8 +12,8 @@ colorama.init()
 
 
 def main():
-    if torch.cuda.is_available():
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    # if torch.cuda.is_available():
+    #     torch.set_default_tensor_type(torch.cuda.FloatTensor)
     random_state = None
     num_runs = 100
     save_distance_matrix = False

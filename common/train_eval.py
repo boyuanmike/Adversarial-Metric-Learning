@@ -21,6 +21,7 @@ from common.evaluation import evaluate_recall
 from datasets.dataset import *
 from models.modifiedgooglenet import ModifiedGoogLeNet
 from models.net import Generator, Discriminator
+from torch.utils import model_zoo
 
 
 def get_optimizer(model):
@@ -49,6 +50,7 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
     # construct the model
 
     model = ModifiedGoogLeNet(p.out_dim, p.normalize_output).to(device)
+
     model_gen = Generator().to(device)
     model_dis = Discriminator(p.out_dim, p.out_dim).to(device)
 
