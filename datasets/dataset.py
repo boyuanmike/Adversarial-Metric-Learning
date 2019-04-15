@@ -110,7 +110,13 @@ class MyData(data.Dataset):
             pool.remove(target_class)
             n_class = np.random.choice(pool)
             pool.append(target_class)
+
+            # p_idx should not be the same as index
+
             p_idx = np.random.choice(self.Index[target_class])
+            while p_idx == index:
+                p_idx = np.random.choice(self.Index[target_class])
+
             n_idx = np.random.choice(self.Index[n_class])
             anchor_fn = os.path.join(self.root, self.images[index])
             pos_fn = os.path.join(self.root, self.images[p_idx])
