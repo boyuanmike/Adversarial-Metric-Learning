@@ -172,7 +172,7 @@ class Car196:
         # root should be the directory with images and train.txt, text.txt
         # example of train.txt can be found at datasets/example
         if root is None:
-            root = '/Users/Mike/Desktop/EECS498/Project/data/car196/car'
+            root = '/Users/Mike/Desktop/EECS498/Project/data/car196'
 
         train_txt = os.path.join(root, 'train.txt')
         test_txt = os.path.join(root, 'test.txt')
@@ -193,3 +193,52 @@ def testCUB_200_2011():
     print(len(data.test))
     print(len(data.train))
     print(data.train[1])
+
+# loader = torch.utils.data.DataLoader(my_data.train, batch_sampler=sampler)
+class BalancedBatchSampler(data.BatchSampler):
+    """
+    Returns batches of size n_classes * n_samples
+    """
+
+    def __init__(self, labels, n_classes, n_samples):
+        self.labels = labels
+        self.labels_set = list(set(self.labels))
+        self.label_to_indices = {}
+        for l in self.labels_set:
+            self.label_to_indices[l] =[]
+        for i in range(len(labels)):
+            l = labels[i]
+            self.label_to_indices[l].append(i)
+
+        for l in self.labels_set:
+            np.random.shuffle(self.label_to_indices[l])
+        self.used_label_indices_count = {label: 0 for label in self.labels_set}
+        self.count = 0
+        self.n_classes = n_classes
+        self.n_samples = n_samples
+        self.n_dataset = len(self.labels)
+        self.batch_size = self.n_samples * self.n_classes
+
+    def __iter__(self):
+        self.count = 0
+        while self.count + self.batch_size < self.n_dataset:
+
+
+            classes = np.random.choice(self.labels_set, self.n_classes, replace=False)
+            indices = []
+            for class_ in classes:
+                pair = self.label_to_indices[class_][
+                               self.used_label_indices_count[class_]:self.used_label_indices_count[
+                                                                       class_] + self.n_samples]
+                print(class_,self.labels[pair[0]],self.labels[pair[1]])
+                indices.extend(pair)
+                self.used_label_indices_count[class_] += self.n_samples
+                if self.used_label_indices_count[class_] + self.n_samples > len(self.label_to_indices[class_]):
+                    np.random.shuffle(self.label_to_indices[class_])
+                    self.used_label_indices_count[class_] = 0
+
+            yield indices
+            self.count += self.n_classes * self.n_samples
+
+    def __len__(self):
+        return self.n_dataset // self.batch_size
