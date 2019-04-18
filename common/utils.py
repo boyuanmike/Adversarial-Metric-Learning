@@ -252,8 +252,8 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
         poss = poss.split(params.batch_size,dim=0)
         negs = negs.split(params.batch_size,dim=0)
 
-        total_loss_gen = 0
-        total_loss_m = 0
+        total_loss_gen = []
+        total_loss_m = []
 
         for i in range(len(ancs)):
             anc = ancs[i].to(device)
@@ -272,12 +272,12 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
             batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
             embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
             loss_m = triplet_loss(embedding_fake)
-            total_loss_m += loss_m
+            total_loss_gen.append(loss_m)
             if epoch < 5:
                 t_loss.backward()
                 fea_opt.step()
             else:
-                total_loss_m.backward()
+                loss_m.backward()
                 opt.step()
                 opt_dis.step()
 
@@ -295,7 +295,7 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
             loss_reg = l2_norm(batch_fake, neg_out)  # batch -> neg_out
             loss_adv = adv_loss(embedding_fake)
             loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
-            total_loss_gen += loss_gen
+            total_loss_gen.append(loss_gen)
             if epoch >= 5:
                 loss_gen.backward()
                 opt_gen.step()
