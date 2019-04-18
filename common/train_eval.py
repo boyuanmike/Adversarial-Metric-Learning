@@ -30,6 +30,10 @@ def get_optimizer(model):
 
 
 def train(main_script_path, func_train_one_batch, param_dict, savev_distance_matrix=False, path=None):
+
+
+    dis_loss = []
+    gen_loss = []
     script_filename = os.path.splitext(os.path.basename(main_script_path))[0]
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -84,15 +88,27 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
 
 
             triplet_batch = generate_random_triplets_from_batch(batch,n_samples= p.n_samples, n_class= 98 )
-            loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
+
+
+            loss_gen_list, loss_dis_list = func_train_one_batch(device, model, model_gen, model_dis,
                                                                 model_optimizer, model_feat_optimizer, gen_optimizer,
                                                                 dis_optimizer, p, triplet_batch,
                                                                 epoch)
-            epoch_loss_gen.append(loss_gen.item())
-            epoch_loss_dis.append(loss_dis.item())
+            # epoch_loss_gen.append(loss_gen.item())
+            # epoch_loss_dis.append(loss_dis.item())
+            for loss_gen in loss_gen_list:
+                epoch_loss_gen.append(loss_gen.item())
+            for loss_dis in loss_dis_list:
+                epoch_loss_dis.append(loss_dis.item())
+
+
+
 
         loss_average_gen = sum(epoch_loss_gen) / float(len(epoch_loss_gen))
         loss_average_dis = sum(epoch_loss_dis) / float(len(epoch_loss_dis))
+
+        dis_loss.append(loss_average_dis)
+        gen_loss.append(loss_average_gen)
 
         D = [0]
         soft = [0]
@@ -136,12 +152,19 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
     logger.save(dir_name)
     p.save(dir_name)
 
-    print("total epochs: {} ({} [s])".format(logger.epoch, logger.total_time))
-    print("best test score (at # {})".format(logger.epoch_best))
-    print("[test]  soft:", logger.soft_test_best)
-    print("[test]  hard:", logger.hard_test_best)
-    print("[test]  retr:", logger.retrieval_test_best)
-    print(str(p).replace(', ', '\n'))
-    print()
+    plt.plot(dis_loss)
+    plt.ylabel("dis_loss")
+    plt.savefig('dis_loss.png')
+
+    plt.plot(gen_loss)
+    plt.ylabel("gen_loss")
+    plt.savefig('gen_loss.png')
+    # print("total epochs: {} ({} [s])".format(logger.epoch, logger.total_time))
+    # print("best test score (at # {})".format(logger.epoch_best))
+    # print("[test]  soft:", logger.soft_test_best)
+    # print("[test]  hard:", logger.hard_test_best)
+    # print("[test]  retr:", logger.retrieval_test_best)
+    # print(str(p).replace(', ', '\n'))
+    # print()
 
     return stop
