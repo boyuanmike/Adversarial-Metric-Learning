@@ -272,7 +272,7 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
             batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
             embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
             loss_m = triplet_loss(embedding_fake)
-            total_loss_gen.append(loss_m)
+            total_loss_m.append(loss_m)
             if epoch < 5:
                 t_loss.backward()
                 fea_opt.step()
