@@ -262,41 +262,61 @@ def lossfun_one_batch(device, model, model_pos_gen, model_neg_gen, dis_model, op
         neg_out = model(neg)  # (N, 512)
 
         t_loss = F_tloss(anc_out, pos_out, neg_out, params.alpha)
-
-        # pos gen
-        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
-        g_pos = model_pos_gen(batch_concat)
-        loss_hard_pos = l2(g_pos, anc_out)
-        loss_reg_pos = l2(g_pos, pos_out)
-        loss_gen_pos = loss_hard_pos + lambda1 * loss_reg_pos
-
-        #neg gen
-        batch_concat_g = torch.cat((anc_out, g_pos, neg_out), dim=1)
-        fake = model_neg_gen(batch_concat_g)  # (N, 512)
-        loss_hard = l2(fake, anc_out)
-        loss_reg = l2(fake, neg_out)  # batch -> neg_out
-
-
-        batch_fake = torch.cat((anc_out, g_pos, fake), dim=0)
-        #pos_out or g_pos?
-        embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
-        loss_adv = adv_loss(embedding_fake)
-        
-        loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
-
-        loss_m = triplet_loss(embedding_fake)
-
         if epoch < 5:
             t_loss.backward()
             fea_opt.step()
         else:
-            loss_gen_pos.backward()
-            loss_gen.backward()
+
+            # pos gen
+            batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
+            g_pos = model_pos_gen(batch_concat)
+            #loss_hard_pos = l2(g_pos, anc_out)
+            #loss_reg_pos = l2(g_pos, pos_out)
+            #loss_gen_pos = loss_hard_pos + lambda1 * loss_reg_pos
+
+            #neg gen
+            batch_concat_g = torch.cat((anc_out, g_pos, neg_out), dim=1)
+            fake = model_neg_gen(batch_concat_g)  # (N, 512)
+
+            batch_fake = torch.cat((anc_out, g_pos, fake), dim=0).detach()
+            #pos_out or g_pos?
+            embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
+            loss_m = triplet_loss(embedding_fake)
             loss_m.backward()
-            opt.step()
             opt_dis.step()
+
+
+
+            #############################
+            #neg gen
+            batch_concat_g = torch.cat((anc_out, g_pos, neg_out), dim=1).detach()
+            fake = model_neg_gen(batch_concat_g)  # (N, 512)
+            loss_hard = l2(fake, anc_out)
+            loss_reg = l2(fake, neg_out)  # batch -> neg_out
+
+            batch_fake = torch.cat((anc_out, g_pos, fake), dim=0)
+            #pos_out or g_pos?
+            embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
+            loss_adv = adv_loss(embedding_fake)
+            loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
+            loss_gen.backward()
             neg_gen.step()
+
+
+            ##################################
+
+            batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1).detach()
+            g_pos = model_pos_gen(batch_concat)
+            loss_hard_pos = l2(g_pos, anc_out)
+            loss_reg_pos = l2(g_pos, pos_out)
+            loss_gen_pos = loss_hard_pos + lambda1 * loss_reg_pos
+            loss_gen_pos.backward()
             opt_gen.step()
+
+
+            ########################################
+            opt.step()
+            
 
         # neg_grad = mu * neg_grad + neg_grad / torch.norm(neg_grad, p=1)
         # neg = neg + epsilon * torch.sign(neg_grad)
