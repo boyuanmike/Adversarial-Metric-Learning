@@ -63,8 +63,8 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
     model_dis = Discriminator(p.out_dim, p.out_dim).to(device)
 
     model_optimizer = optim.Adam(model.parameters(),lr= p.learning_rate/1000,weight_decay=p.l2_weight_decay)
-    gen_optimizer = optim.Adam(model_gen.parameters(), lr =p.gen_learning_rate/10,weight_decay=p.l2_weight_decay)
-    dis_optimizer = optim.Adam(model_dis.parameters(), lr =p.dis_learning_rate,weight_decay=p.l2_weight_decay)
+    gen_optimizer = optim.Adam(model_gen.parameters(), lr =p.learning_rate/10,weight_decay=p.l2_weight_decay)
+    dis_optimizer = optim.Adam(model_dis.parameters(), lr =p.learning_rate,weight_decay=p.l2_weight_decay)
     model_feat_optimizer = optim.Adam(model.parameters(),lr= p.learning_rate,weight_decay=p.l2_weight_decay)
 
 
