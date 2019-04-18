@@ -37,7 +37,7 @@ def main():
         tradeoff=1.0,
         l2_weight_decay=1e-3,
         alpha=1.0,
-        learning_rate = 1e-3
+        learning_rate = 1e-4
     )
     # sampler = ParameterSampler(param_distributions, num_runs, random_state)
     train(__file__, lossfun_one_batch,
