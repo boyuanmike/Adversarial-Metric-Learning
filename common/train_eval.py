@@ -24,9 +24,9 @@ from models.net import Generator, Discriminator
 from torch.utils import model_zoo
 
 
-def get_optimizer(model):
-    optimizer = optim.Adam(model.parameters())
-    return optimizer
+# def get_optimizer(model):
+#     optimizer = optim.Adam(model.())
+#     return optimizer
 
 
 def train(main_script_path, func_train_one_batch, param_dict, savev_distance_matrix=False, path=None):
@@ -62,10 +62,11 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
     model_gen = Generator().to(device)
     model_dis = Discriminator(p.out_dim, p.out_dim).to(device)
 
-    model_optimizer = get_optimizer(model)
-    gen_optimizer = get_optimizer(model_gen)
-    dis_optimizer = get_optimizer(model_dis)
-    model_feat_optimizer = get_optimizer(model)
+    model_optimizer = optim.Adam(model.parameters(),lr= p.dis_learning_rate)
+    gen_optimizer = optim.Adam(model_gen.parameters(), lr =p.gen_learning_rate)
+    dis_optimizer = optim.Adam(model_dis.parameters(), lr =p.dis_learning_rate)
+    model_feat_optimizer = optim.Adam(model.parameters(),lr= p.dis_learning_rate)
+
 
     stop = False
     logger = Logger(log_dir_path)
