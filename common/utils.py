@@ -15,7 +15,7 @@ import torch.nn.functional as F
 
 import copy
 import os
-
+from datasets.dataset import *
 import matplotlib.pyplot as plt
 import six
 import time
@@ -246,61 +246,66 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen
     #     y_a, y_p = F.split_axis(y, 2, axis=0)
     #     return angular_mc_loss_m(y_a, y_p, params.tradeoff, params.alpha)
     if params.loss == "triplet":
-        anc, pos, neg = batch
-        anc = anc.to(device)
-        pos = pos.to(device)
-        neg = neg.to(device)
 
-        anc_out = model(anc)  # (N, 512)
-        pos_out = model(pos)  # (N, 512)
-        neg_out = model(neg)  # (N, 512)
+        ancs, poss, negs = batch
+        ancs = ancs.split(params.batch_size,dim=0)
+        poss = poss.split(params.batch_size,dim=0)
+        negs = negs.split(params.batch_size,dim=0)
 
-        t_loss = F_tloss(anc_out, pos_out, neg_out, params.alpha)
+        total_loss_gen = 0
+        total_loss_m = 0
 
-        # Train model and dis_model
-        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
-        fake = gen_model(batch_concat).detach()  # (N, 512)
-        batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
-        embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
-        loss_m = triplet_loss(embedding_fake)
+        for i in range(len(ancs)):
+            anc = ancs[i].to(device)
+            pos = poss[i].to(device)
+            neg = negs[i].to(device)
 
-        if epoch < 5:
-            t_loss.backward()
-            fea_opt.step()
-        else:
-            loss_m.backward()
-            opt.step()
-            opt_dis.step()
+            anc_out = model(anc)  # (N, 512)
+            pos_out = model(pos)  # (N, 512)
+            neg_out = model(neg)  # (N, 512)
 
-        # train gen_model
-        anc_out = anc_out.detach()
-        pos_out = pos_out.detach()
-        neg_out = neg_out.detach()
-        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
+            t_loss = F_tloss(anc_out, pos_out, neg_out, params.alpha)
 
-        fake = gen_model(batch_concat)  # (N, 512)
-        batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
-        embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
+            # Train model and dis_model
+            batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
+            fake = gen_model(batch_concat).detach()  # (N, 512)
+            batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
+            embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
+            loss_m = triplet_loss(embedding_fake)
+            total_loss_m += loss_m
+            if epoch < 5:
+                t_loss.backward()
+                fea_opt.step()
+            else:
+                total_loss_m.backward()
+                opt.step()
+                opt_dis.step()
 
-        loss_hard = l2_hard(batch_fake, anc_out)  # batch -> anc_out
-        loss_reg = l2_norm(batch_fake, neg_out)  # batch -> neg_out
-        loss_adv = adv_loss(embedding_fake)
-        loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
+            # train gen_model
+            anc_out = anc_out.detach()
+            pos_out = pos_out.detach()
+            neg_out = neg_out.detach()
+            batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
 
-        if epoch >= 5:
-            loss_gen.backward()
-            opt_gen.step()
+            fake = gen_model(batch_concat)  # (N, 512)
+            batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
+            embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
 
-        model.zero_grad()
-        gen_model.zero_grad()
-        dis_model.zero_grad()
+            loss_hard = l2_hard(batch_fake, anc_out)  # batch -> anc_out
+            loss_reg = l2_norm(batch_fake, neg_out)  # batch -> neg_out
+            loss_adv = adv_loss(embedding_fake)
+            loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
+            total_loss_gen += loss_gen
+            if epoch >= 5:
+                loss_gen.backward()
+                opt_gen.step()
 
-        # neg_grad = mu * neg_grad + neg_grad / torch.norm(neg_grad, p=1)
-        # neg = neg + epsilon * torch.sign(neg_grad)
+            model.zero_grad()
+            gen_model.zero_grad()
+            dis_model.zero_grad()
 
-        # chainer.reporter.report({'loss_gen': loss_gen})
-        # chainer.reporter.report({'loss_dis': loss_m})
-        return loss_gen, loss_m
+
+        return total_loss_gen,total_loss_m
 
 
 def evaluate(device, model, dis_model, test_loader, distance='euclidean', normalize=False,

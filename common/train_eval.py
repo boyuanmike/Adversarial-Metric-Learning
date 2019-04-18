@@ -44,7 +44,11 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
         data = Car196(root=path)
     else:
         data = CUB_200_2011(root=path)
-    train_loader = torch.utils.data.DataLoader(data.train, batch_size=p.batch_size)
+
+    sampler = BalancedBatchSampler(data.train.labels, n_samples=p.n_samples, n_classes= 98)
+    kwargs = {'num_workers': 1, 'pin_memory': True}
+    # train_loader = torch.utils.data.DataLoader(data.train, batch_size=p.batch_size)
+    train_loader = torch.utils.data.DataLoader(data.train, batch_sampler = sampler, **kwargs)
     # train_it = iter(train_loader)
     test_loader = torch.utils.data.DataLoader(data.test, batch_size=p.batch_size)
     # construct the model
@@ -77,10 +81,13 @@ def train(main_script_path, func_train_one_batch, param_dict, savev_distance_mat
         # for i in t:
         #     t.set_description(desc='# {}'.format(epoch))
         for batch in tqdm(train_loader, desc='# {}'.format(epoch)):
+
+
+            triplet_batch = generate_random_triplets_from_batch(batch,n_samples= p.n_samples, n_class= 98 )
             loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
-                                                      model_optimizer, model_feat_optimizer, gen_optimizer,
-                                                      dis_optimizer, p, batch,
-                                                      epoch)
+                                                                model_optimizer, model_feat_optimizer, gen_optimizer,
+                                                                dis_optimizer, p, triplet_batch,
+                                                                epoch)
             epoch_loss_gen.append(loss_gen.item())
             epoch_loss_dis.append(loss_dis.item())
 

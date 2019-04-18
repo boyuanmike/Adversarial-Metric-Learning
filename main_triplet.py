@@ -21,6 +21,7 @@ def main():
         learning_rate=LogUniformDistribution(low=1e-5, high=1e-4),
     )
     static_params = dict(
+        n_samples = 5,
         num_epochs=100,
         num_batches_per_epoch=60,
         batch_size=32,
@@ -35,17 +36,19 @@ def main():
         loss='triplet',
         tradeoff=1.0,
         l2_weight_decay=1e-3,
-        alpha=1.0
+        alpha=1.0,
+        learning_rate = 1e-3
     )
-    sampler = ParameterSampler(param_distributions, num_runs, random_state)
-
-    for random_params in sampler:
-        params = {}
-        params.update(random_params)
-        params.update(static_params)
-
-        stop = train(__file__, lossfun_one_batch,
-                     params, save_distance_matrix, '/disk-main/car196')
+    # sampler = ParameterSampler(param_distributions, num_runs, random_state)
+    train(__file__, lossfun_one_batch,
+          static_params, save_distance_matrix, '/disk-main/car196')
+    # for random_params in sampler:
+    #     params = {}
+    #     params.update(random_params)
+    #     params.update(static_params)
+    #
+    #     stop = train(__file__, lossfun_one_batch,
+    #                  params, save_distance_matrix, '/disk-main/car196')
 
 
 if __name__ == '__main__':
