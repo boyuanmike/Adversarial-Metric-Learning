@@ -15,10 +15,12 @@ class Generator(nn.Module):
         self.out_dim = out_dim
 
         self.l0 = nn.Linear(self.out_dim * 3, self.out_dim)
+        nn.init.normal_(self.l0.weight, std=0.02)
         # self.l0.weight.data.copy_(???)
         # w = chainer.initializers.Normal(0.02)
 
         self.l1 = nn.Linear(self.out_dim, self.out_dim)
+        nn.init.normal_(self.l0.weight, std=0.02)
         # copy weight to l1
         # self.l1.weight.data.copy_(???)
 
@@ -37,11 +39,13 @@ class Discriminator(nn.Module):
         self.out_dim = out_dim
 
         self.l0 = nn.Linear(self.in_dim, self.out_dim)
-        if self.in_dim == self.out_dim:
-            self.l0.weight.data.copy_(torch.eye(self.out_dim))
+        nn.init.eye_(self.l0.weight)
+        #if self.in_dim == self.out_dim:
+        #    self.l0.weight.data.copy_(torch.eye(self.out_dim))
         self.l1 = nn.Linear(self.out_dim, self.out_dim)
+        nn.init.eye_(self.l1.weight)
         # copy weight to l1
-        self.l1.weight.data.copy_(torch.eye(self.out_dim))
+        #self.l1.weight.data.copy_(torch.eye(self.out_dim))
 
     def forward(self, x):
         h = self.l0(x)
