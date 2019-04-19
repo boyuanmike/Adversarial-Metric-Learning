@@ -10,6 +10,7 @@ from datasets import transforms
 import numpy as np
 from itertools import combinations
 
+
 def default_loader(path):
     return Image.open(path).convert('RGB')
 
@@ -19,7 +20,7 @@ def Generate_transform_Dict(origin_width=256, width=224, ratio=0.16):
     normalize = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
                                      std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
 
-    transform_dict = {}
+    transform_dict = dict()
 
     transform_dict['rand-crop'] = \
         transforms.Compose([
@@ -95,44 +96,45 @@ class MyData(data.Dataset):
         self.triplet = triplet
 
     def __getitem__(self, index):
-            fn, label = self.images[index], self.labels[index]
-            fn = os.path.join(self.root, fn)
-            img = self.loader(fn)
-            if self.transform is not None:
-                img = self.transform(img)
-            return img, label
-        # if self.triplet == False:
-        #     fn, label = self.images[index], self.labels[index]
-        #     fn = os.path.join(self.root, fn)
-        #     img = self.loader(fn)
-        #     if self.transform is not None:
-        #         img = self.transform(img)
-        #     return img, label
-        # else:
-        #     target_class = self.labels[index]
-        #
-        #     # pool to choose n_idx
-        #     pool = self.classes
-        #     pool.remove(target_class)
-        #     n_class = np.random.choice(pool)
-        #     pool.append(target_class)
-        #
-        #     # p_idx should not be the same as index
-        #
-        #     p_idx = np.random.choice(self.Index[target_class])
-        #     while p_idx == index:
-        #         p_idx = np.random.choice(self.Index[target_class])
-        #
-        #     n_idx = np.random.choice(self.Index[n_class])
-        #     anchor_fn = os.path.join(self.root, self.images[index])
-        #     pos_fn = os.path.join(self.root, self.images[p_idx])
-        #     neg_fn = os.path.join(self.root, self.images[n_idx])
-        #     anchor_img = self.loader(anchor_fn)
-        #     pos_img = self.loader(pos_fn)
-        #     neg_img = self.loader(neg_fn)
-        #     if self.transform is not None:
-        #         return self.transform(anchor_img), self.transform(pos_img), self.transform(neg_img)
-        #     return anchor_img, pos_img, neg_img
+        fn, label = self.images[index], self.labels[index]
+        fn = os.path.join(self.root, fn)
+        img = self.loader(fn)
+        if self.transform is not None:
+            img = self.transform(img)
+        return img, label
+
+    # if self.triplet == False:
+    #     fn, label = self.images[index], self.labels[index]
+    #     fn = os.path.join(self.root, fn)
+    #     img = self.loader(fn)
+    #     if self.transform is not None:
+    #         img = self.transform(img)
+    #     return img, label
+    # else:
+    #     target_class = self.labels[index]
+    #
+    #     # pool to choose n_idx
+    #     pool = self.classes
+    #     pool.remove(target_class)
+    #     n_class = np.random.choice(pool)
+    #     pool.append(target_class)
+    #
+    #     # p_idx should not be the same as index
+    #
+    #     p_idx = np.random.choice(self.Index[target_class])
+    #     while p_idx == index:
+    #         p_idx = np.random.choice(self.Index[target_class])
+    #
+    #     n_idx = np.random.choice(self.Index[n_class])
+    #     anchor_fn = os.path.join(self.root, self.images[index])
+    #     pos_fn = os.path.join(self.root, self.images[p_idx])
+    #     neg_fn = os.path.join(self.root, self.images[n_idx])
+    #     anchor_img = self.loader(anchor_fn)
+    #     pos_img = self.loader(pos_fn)
+    #     neg_img = self.loader(neg_fn)
+    #     if self.transform is not None:
+    #         return self.transform(anchor_img), self.transform(pos_img), self.transform(neg_img)
+    #     return anchor_img, pos_img, neg_img
 
     def __len__(self):
         return len(self.images)
@@ -200,6 +202,7 @@ def testCUB_200_2011():
     print(len(data.train))
     print(data.train[1])
 
+
 # loader = torch.utils.data.DataLoader(my_data.train, batch_sampler=sampler)
 class BalancedBatchSampler(data.BatchSampler):
     """
@@ -211,7 +214,7 @@ class BalancedBatchSampler(data.BatchSampler):
         self.labels_set = list(set(self.labels))
         self.label_to_indices = {}
         for l in self.labels_set:
-            self.label_to_indices[l] =[]
+            self.label_to_indices[l] = []
         for i in range(len(labels)):
             l = labels[i]
             self.label_to_indices[l].append(i)
@@ -229,13 +232,12 @@ class BalancedBatchSampler(data.BatchSampler):
         self.count = 0
         while self.count + self.batch_size < self.n_dataset:
 
-
             classes = np.random.choice(self.labels_set, self.n_classes, replace=False)
             indices = []
             for class_ in classes:
                 pair = self.label_to_indices[class_][
-                               self.used_label_indices_count[class_]:self.used_label_indices_count[
-                                                                       class_] + self.n_samples]
+                       self.used_label_indices_count[class_]:self.used_label_indices_count[
+                                                                 class_] + self.n_samples]
                 indices.extend(pair)
                 self.used_label_indices_count[class_] += self.n_samples
                 if self.used_label_indices_count[class_] + self.n_samples > len(self.label_to_indices[class_]):
@@ -249,20 +251,20 @@ class BalancedBatchSampler(data.BatchSampler):
         return self.n_dataset // self.batch_size
 
 
-def generate_random_triplets_from_batch(batch, n_samples,n_class):
-    #batch [batch_size,3,244,244]
+def generate_random_triplets_from_batch(batch, n_samples, n_class):
+    # batch [batch_size,3,244,244]
     batch_size = batch[0].shape[0]
     image_clusters = batch[0].split(n_samples)
     triplets = []
     for i in range(len(image_clusters)):
         anchor_positives = list(combinations(image_clusters[i], 2))
         n_idx = np.random.randint(n_class)
-        while(n_idx == i):
+        while n_idx == i:
             n_idx = np.random.randint(n_class)
         negs = image_clusters[n_idx]
         for anchor_positive in anchor_positives:
             r_index = np.random.randint(n_samples)
-            triplets.append(anchor_positive+(negs[r_index],))
+            triplets.append(anchor_positive + (negs[r_index],))
 
     anc = []
     pos = []
@@ -272,10 +274,8 @@ def generate_random_triplets_from_batch(batch, n_samples,n_class):
         pos.append(triplet[1])
         neg.append(triplet[2])
 
-    anc_tensor = torch.stack(anc,0)
-    pos_tensor = torch.stack(pos,0)
-    neg_tensor = torch.stack(neg,0)
+    anc_tensor = torch.stack(anc, 0)
+    pos_tensor = torch.stack(pos, 0)
+    neg_tensor = torch.stack(neg, 0)
 
-    return (anc_tensor,pos_tensor,neg_tensor)
-
-
+    return anc_tensor, pos_tensor, neg_tensor
