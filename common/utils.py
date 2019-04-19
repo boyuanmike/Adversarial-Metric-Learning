@@ -260,7 +260,7 @@ def evaluate(device, model, dis_model, test_loader, epoch, distance='euclidean',
         y_data, c_data = iterate_forward(device,
                                          model, dis_model, test_loader, epoch,
                                          normalize=normalize)
-    nmi, f1 = evaluate_cluster(y_data, c_data, 98)
+    nmi, f1 = evaluate_cluster(y_data, c_data, 10)
     return nmi, f1
 
 

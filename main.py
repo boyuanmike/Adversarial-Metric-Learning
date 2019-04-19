@@ -8,7 +8,7 @@ colorama.init()
 
 def main():
     static_params = dict(
-        n_samples=5,
+        n_samples=25,
         num_epochs=100,
         batch_size=64,
         out_dim=512,
@@ -18,7 +18,8 @@ def main():
         dataset='car196',
         l2_weight_decay=1e-4,
         alpha=10.0,
-        learning_rate=1e-4
+        learning_rate=1e-4,
+        n_classes=10
     )
     train(lossfun_one_batch, static_params, '/disk-main/car196')
 
