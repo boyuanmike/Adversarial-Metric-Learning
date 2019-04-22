@@ -1,20 +1,24 @@
-import torch.optim as optim
-from torch.utils import model_zoo
+import time
 
-from common.utils import *
-from datasets.dataset import *
+import matplotlib.pyplot as plt
+import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
+from common.utils import Logger, evaluate
+from datasets.dataset import BalancedBatchSampler, generate_random_triplets_from_batch
+from datasets.dataset import Car196, CUB_200_2011
 from models.modifiedgooglenet import ModifiedGoogLeNet
 from models.net import Generator, Discriminator
-import time
-import matplotlib.pyplot as plt
+import os
 
 
-def train(func_train_one_batch, param_dict, path):
+def train(func_train_one_batch, param_dict, path, log_dir_path):
     dis_loss = []
     gen_loss = []
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    log_dir_path = "/disk-main/logs/"
 
     p = Logger(log_dir_path, **param_dict)
 
@@ -24,20 +28,24 @@ def train(func_train_one_batch, param_dict, path):
     else:
         data = CUB_200_2011(root=path)
 
-    sampler = BalancedBatchSampler(data.train.labels, n_samples=p.n_samples, n_classes=98)
-    kwargs = {'num_workers': 1, 'pin_memory': True}
-    # train_loader = torch.utils.data.DataLoader(data.train, batch_size=p.batch_size)
-    train_loader = torch.utils.data.DataLoader(data.train, batch_sampler=sampler, **kwargs)
-    # train_it = iter(train_loader)
-    test_loader = torch.utils.data.DataLoader(data.test, batch_size=p.batch_size)
+    sampler = BalancedBatchSampler(data.train.label_to_indices, n_samples=p.n_samples, n_classes=p.n_classes)
+    kwargs = {'num_workers': 6, 'pin_memory': True}
+
+    train_loader = DataLoader(data.train, batch_sampler=sampler, **kwargs)  # (5 * 98, 3, 224, 224)
+
+    # train_iter = iter(train_loader)
+    # batch = next(train_iter)
+    # generate_random_triplets_from_batch(batch, p.n_samples, p.n_classes)
+
+    test_loader = DataLoader(data.test, batch_size=p.batch_size)
 
     # construct the model
     model = ModifiedGoogLeNet(p.out_dim, p.normalize_output).to(device)
-    model_gen = Generator().to(device)
-    model_dis = Discriminator(p.out_dim, p.out_dim).to(device)
+    model_gen = Generator(p.out_dim, p.normalize_output).to(device)
+    model_dis = Discriminator(p.out_dim, p.out_dim, p.normalize_output).to(device)
 
-    model_optimizer = optim.Adam(model.parameters(), lr=p.learning_rate / 1e3, weight_decay=p.l2_weight_decay)
-    gen_optimizer = optim.Adam(model_gen.parameters(), lr=p.learning_rate * 10)
+    model_optimizer = optim.Adam(model.parameters(), lr=p.learning_rate, weight_decay=p.l2_weight_decay)
+    gen_optimizer = optim.Adam(model_gen.parameters(), lr=p.learning_rate)
     dis_optimizer = optim.Adam(model_dis.parameters(), lr=p.learning_rate, weight_decay=p.l2_weight_decay)
     model_feat_optimizer = optim.Adam(model.parameters(), lr=p.learning_rate)
 
@@ -49,36 +57,39 @@ def train(func_train_one_batch, param_dict, path):
 
     for epoch in range(p.num_epochs):
         time_begin = time.time()
-        epoch_loss_gen = []
-        epoch_loss_dis = []
-
+        epoch_loss_gen = 0
+        epoch_loss_dis = 0
+        total = 0
         for batch in tqdm(train_loader, desc='# {}'.format(epoch)):
-            triplet_batch = generate_random_triplets_from_batch(batch, n_samples=p.n_samples, n_class=98)
-            loss_gen_list, loss_dis_list = func_train_one_batch(device, model, model_gen, model_dis,
-                                                                model_optimizer, model_feat_optimizer, gen_optimizer,
-                                                                dis_optimizer, p, triplet_batch,
-                                                                epoch)
-            # epoch_loss_gen.append(loss_gen.item())
-            # epoch_loss_dis.append(loss_dis.item())
-            for loss_gen in loss_gen_list:
-                epoch_loss_gen.append(loss_gen.item())
-            for loss_dis in loss_dis_list:
-                epoch_loss_dis.append(loss_dis.item())
+            triplet_batch = generate_random_triplets_from_batch(batch, n_samples=p.n_samples, n_class=p.n_classes)
+            loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
+                                                      model_optimizer, model_feat_optimizer, gen_optimizer,
+                                                      dis_optimizer, p, triplet_batch,
+                                                      epoch)
+            epoch_loss_gen += loss_gen
+            epoch_loss_dis += loss_dis
+            total += triplet_batch[0].size(0)
 
-        loss_average_gen = sum(epoch_loss_gen) / float(len(epoch_loss_gen))
-        loss_average_dis = sum(epoch_loss_dis) / float(len(epoch_loss_dis))
+        loss_average_gen = epoch_loss_gen / total
+        loss_average_dis = epoch_loss_dis / total
 
         dis_loss.append(loss_average_dis)
         gen_loss.append(loss_average_gen)
 
         nmi, f1 = evaluate(device, model, model_dis, test_loader, epoch,
-                           distance=p.distance_type, normalize=p.normalize_output)
+                           n_classes=p.n_classes,
+                           distance=p.distance_type,
+                           normalize=p.normalize_output,
+                           neg_gen_epoch=p.neg_gen_epoch)
         if nmi > best_nmi_1:
             best_nmi_1 = nmi
             best_f1_1 = f1
-            torch.save(model, "/disk-main/models/model.pt")
-            torch.save(model_gen, '/disk-main/models/model_gen.pt')
-            torch.save(model_dis, '/disk-main/models/model_dis.pt')
+            # torch.save(model, "/disk-main/models/model.pt")
+            torch.save(model, os.path.join(p.model_save_path, "model.pt"))
+            # torch.save(model_gen, '/disk-main/models/model_gen.pt')
+            torch.save(model_gen, os.path.join(p.model_save_path, "model_gen.pt"))
+            # torch.save(model_dis, '/disk-main/models/model_dis.pt')
+            torch.save(model_dis, os.path.join(p.model_save_path, "model_dis.pt"))
         if f1 > best_f1_2:
             best_nmi_2 = nmi
             best_f1_2 = f1
@@ -104,6 +115,7 @@ def train(func_train_one_batch, param_dict, path):
     plt.plot(gen_loss)
     plt.ylabel("gen_loss")
     plt.savefig('gen_loss.png')
+
     # print("total epochs: {} ({} [s])".format(logger.epoch, logger.total_time))
     # print("best test score (at # {})".format(logger.epoch_best))
     # print("[test]  soft:", logger.soft_test_best)

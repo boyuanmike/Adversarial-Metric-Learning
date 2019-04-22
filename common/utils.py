@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-
-
 import itertools
+import os
+from collections import defaultdict
 
+import numpy as np
+import torch
 import torch.nn.functional as F
 import yaml
 from tqdm import tqdm
 
 from common.evaluation import evaluate_cluster
-from datasets.dataset import *
-from functions.triplet_loss import triplet_loss as F_tloss
 
 
 def load_params(filename):
@@ -121,7 +121,8 @@ class Logger(defaultdict):
             f.write(text)
 
 
-def iterate_forward(device, model, dis_model, test_loader, epoch, normalize=False):
+def iterate_forward(device, model, dis_model, test_loader,
+                    epoch, normalize=False, neg_gen_epoch=0):
     y_batches = []
     c_batches = []
     for anchors, labels in tqdm(test_loader):
@@ -129,7 +130,7 @@ def iterate_forward(device, model, dis_model, test_loader, epoch, normalize=Fals
         labels = labels.to(device)
         y_batch = model(anchors)
 
-        if epoch >= 0:
+        if epoch >= neg_gen_epoch:
             y_batch = dis_model(y_batch)
         if normalize:
             y_norm = torch.norm(y_batch, p=2, dim=1, keepdim=True)
@@ -180,121 +181,106 @@ def compute_soft_hard_retrieval(distance_matrix, labels, label_batch=None):
     return average_soft, average_hard, average_retrieval
 
 
-def lossfun_one_batch(device, model, gen_model, dis_model, opt, fea_opt, opt_gen, opt_dis, params, batch, epoch):
+def lossfun_one_batch(device, model, gen_model, dis_model, opt,
+                      fea_opt, opt_gen, opt_dis, params, batch, epoch):
     # the first half of a batch are the anchors and the latters
     # are the positive examples corresponding to each anchor
+    lambda_ = 1
     lambda1 = 1.0
-    lambda2 = 1.0
+    lambda2 = 50
+
     model.train()
+    gen_model.train()
+    dis_model.train()
 
     ancs, poss, negs = batch
     ancs = ancs.split(params.batch_size, dim=0)
     poss = poss.split(params.batch_size, dim=0)
     negs = negs.split(params.batch_size, dim=0)
 
-    total_loss_gen = []
-    total_loss_m = []
+    total_loss_gen = 0
+    total_loss_m = 0
 
     for i in range(len(ancs)):
         anc = ancs[i].to(device)
         pos = poss[i].to(device)
         neg = negs[i].to(device)
 
+        model.zero_grad()
+        gen_model.zero_grad()
+        dis_model.zero_grad()
+
         anc_out = model(anc)  # (N, 512)
         pos_out = model(pos)  # (N, 512)
         neg_out = model(neg)  # (N, 512)
 
-        t_loss = F_tloss(anc_out, pos_out, neg_out, params.alpha)
-
-        # Train model and dis_model
-        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
-        fake = gen_model(batch_concat)  # (N, 512)
-        batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
-        embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
-        loss_m = triplet_loss(embedding_fake)
-
-        total_loss_m.append(loss_m)
-
-        if epoch < 0:
+        if epoch < params.neg_gen_epoch:
+            # t_loss = torch.mean(F.relu(torch.norm(anc_out - pos_out, dim=1) ** 2
+            #                            - torch.norm(anc_out - neg_out) ** 2 + params.alpha))
+            t_loss = F.triplet_margin_loss(anc_out, pos_out, neg_out, margin=params.alpha)
             t_loss.backward()
             fea_opt.step()
-        else:
-            loss_m.backward()
-            opt.step()
-            opt_dis.step()
+            continue
 
-        # train gen_model
-        anc_out = anc_out.detach()
-        pos_out = pos_out.detach()
-        neg_out = neg_out.detach()
+        # Train dis_model
         batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
-
         fake = gen_model(batch_concat)  # (N, 512)
         batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
         embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
+        loss_m = lambda_ * triplet_loss(embedding_fake, margin=params.alpha)
+        total_loss_m += loss_m.item() * anc.size(0)
 
-        loss_hard = torch.mean(F.pairwise_distance(fake, anc_out, p=2))
-        # loss_hard = l2_hard(batch_fake, anc_out)  # batch -> anc_out
-        loss_reg = torch.mean(F.pairwise_distance(fake, neg_out, p=2))
-        # loss_reg = l2_norm(batch_fake, neg_out)  # batch -> neg_out
-        loss_adv = adv_loss(embedding_fake)
-        loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
-        total_loss_gen.append(loss_gen)
-
-        if epoch >= 0:
-            loss_gen.backward()
-            opt_gen.step()
+        loss_m.backward()
+        opt.step()
+        opt_dis.step()
 
         model.zero_grad()
         gen_model.zero_grad()
         dis_model.zero_grad()
 
+        # train gen_model
+        anc_out = anc_out.detach()
+        pos_out = pos_out.detach()
+        neg_out = neg_out.detach()
+
+        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=1)
+        fake = gen_model(batch_concat)  # (N, 512)
+        batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
+        embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
+
+        loss_hard = torch.mean(torch.norm(fake - anc_out, dim=1))
+        loss_reg = torch.mean(torch.norm(fake - neg_out, dim=1))
+        loss_adv = adv_loss(embedding_fake, margin=params.alpha)
+        loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
+        total_loss_gen += loss_gen.item() * anc.size(0)
+
+        loss_gen.backward()
+        opt_gen.step()
+
     return total_loss_gen, total_loss_m
 
 
-def evaluate(device, model, dis_model, test_loader, epoch, distance='euclidean', normalize=False):
+def evaluate(device, model, dis_model, test_loader,
+             epoch, n_classes, distance='euclidean', normalize=False, neg_gen_epoch=0):
     if distance not in ('cosine', 'euclidean'):
         raise ValueError("distance must be 'euclidean' or 'cosine'.")
     model.eval()
+    dis_model.eval()
     with torch.no_grad():
         y_data, c_data = iterate_forward(device,
                                          model, dis_model, test_loader, epoch,
-                                         normalize=normalize)
-    nmi, f1 = evaluate_cluster(y_data, c_data, 98)
+                                         normalize=normalize, neg_gen_epoch=neg_gen_epoch)
+    nmi, f1 = evaluate_cluster(y_data, c_data, n_classes)
     return nmi, f1
 
 
-def triplet_loss(y, alpha=1.0):
-    a, p, n = split_to_three(y)
-
-    return F.triplet_margin_loss(a, p, n, margin=alpha)
-
-    # distance = torch.sum((a - p) ** 2.0, dim=1) - torch.sum((a - n) ** 2.0, dim=1) + alpha
-    # return torch.mean(F.relu(distance)) / 2
+def triplet_loss(y, margin=1.0):
+    a, p, n = torch.chunk(y, 3, dim=0)
+    # return torch.mean(F.relu(torch.norm(a - p, dim=1) ** 2 - torch.norm(a - n) ** 2 + margin))
+    return F.triplet_margin_loss(a, p, n, margin=margin)
 
 
-def adv_loss(y, alpha=1.0):
-    return -triplet_loss(y, alpha)
-    # a, p, n = split_to_three(y)
-    # distance = -torch.sum((a - p) ** 2.0, dim=1) + torch.sum((a - n) ** 2.0, dim=1) - alpha
-    #
-    # return torch.mean(F.relu(distance)) / 2
-
-
-# def l2_norm(fake, neg_out):
-#     _, _, fake_n = split_to_three(fake)
-#     l2 = torch.sum((fake_n - neg_out) ** 2.0, dim=1)
-#     return torch.mean(l2)
-
-
-# def l2_hard(fake, anc_out):
-#     _, _, fake_n = split_to_three(fake)
-#     l2 = torch.sum((fake_n - anc_out) ** 2.0, dim=1)  # a -> anc_out
-#     return torch.mean(l2)
-
-
-def split_to_three(y, dim=0):
-    # split along dim=0 into three pieces
-    d = y.size(dim)
-    a, p, n = torch.split(y, d // 3, dim=dim)
-    return a, p, n
+def adv_loss(y, margin=1.0):
+    a, p, n = torch.chunk(y, 3, dim=0)
+    # return torch.mean(F.relu(torch.norm(a - n, dim=1) ** 2 - torch.norm(a - p) ** 2 - margin))
+    return torch.mean(F.relu(torch.norm(a - n) - torch.norm(a - p) - margin))

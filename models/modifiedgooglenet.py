@@ -3,10 +3,10 @@
 import torch
 import torch.nn as nn
 
-from models.google_net import *
+from models.google_net import googlenet
 
 
-class ModifiedGoogLeNet(GoogLeNet):
+class ModifiedGoogLeNet(nn.Module):
     def __init__(self, out_dims=64, normalize_output=False):
         super(ModifiedGoogLeNet, self).__init__()
         self.googlenet = googlenet(pretrained=True)
@@ -14,7 +14,7 @@ class ModifiedGoogLeNet(GoogLeNet):
         self.normalize_output = normalize_output
 
     def forward(self, x):
-        if self.training and self.aux_logits:
+        if self.training and self.googlenet.aux_logits:
             *_, y = self.googlenet(x)
         else:
             y = self.googlenet(x)

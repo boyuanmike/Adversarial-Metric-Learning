@@ -1,12 +1,11 @@
 from __future__ import absolute_import, print_function
-from torchvision.transforms import *
+from torchvision.transforms import transforms
 
 import torch
 import torch.utils.data as data
 from PIL import Image
 import os
 from collections import defaultdict
-from datasets import transforms
 import numpy as np
 from itertools import combinations
 
@@ -15,7 +14,17 @@ def default_loader(path):
     return Image.open(path).convert('RGB')
 
 
-def Generate_transform_Dict(origin_width=256, width=224, ratio=0.16):
+class CovertBGR(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, img):
+        r, g, b = img.split()
+        img = Image.merge("RGB", (b, g, r))
+        return img
+
+
+def generate_transform_dict(origin_width=256, width=224, ratio=0.16):
     std_value = 1.0 / 255.0
     normalize = transforms.Normalize(mean=[104 / 255.0, 117 / 255.0, 128 / 255.0],
                                      std=[1.0 / 255, 1.0 / 255, 1.0 / 255])
@@ -24,7 +33,7 @@ def Generate_transform_Dict(origin_width=256, width=224, ratio=0.16):
 
     transform_dict['rand-crop'] = \
         transforms.Compose([
-            transforms.CovertBGR(),
+            CovertBGR(),
             transforms.Resize(origin_width),
             transforms.RandomResizedCrop(scale=(ratio, 1), size=width),
             transforms.RandomHorizontalFlip(),
@@ -34,7 +43,7 @@ def Generate_transform_Dict(origin_width=256, width=224, ratio=0.16):
 
     transform_dict['center-crop'] = \
         transforms.Compose([
-            transforms.CovertBGR(),
+            CovertBGR(),
             transforms.Resize(origin_width),
             transforms.CenterCrop(width),
             transforms.ToTensor(),
@@ -43,7 +52,7 @@ def Generate_transform_Dict(origin_width=256, width=224, ratio=0.16):
 
     transform_dict['resize'] = \
         transforms.Compose([
-            transforms.CovertBGR(),
+            CovertBGR(),
             transforms.Resize(width),
             transforms.CenterCrop(width),
             transforms.ToTensor(),
@@ -62,7 +71,7 @@ class MyData(data.Dataset):
             label_txt = os.path.join(root, 'train.txt')
 
         if transform is None:
-            transform_dict = Generate_transform_Dict()['rand-crop']
+            transform = generate_transform_dict()['rand-crop']
 
         # read txt get image path and labels
         file = open(label_txt)
@@ -74,16 +83,16 @@ class MyData(data.Dataset):
         for img_anon in images_anon:
             # img_anon = img_anon.replace(' ', '\t')
 
-            [img, label] = img_anon.split(' ')
+            img, label = img_anon.split(' ')
             images.append(img)
             labels.append(int(label))
 
         classes = list(set(labels))
 
         # Generate Index Dictionary for every class
-        Index = defaultdict(list)
+        label_to_indices = defaultdict(list)
         for i, label in enumerate(labels):
-            Index[label].append(i)
+            label_to_indices[label].append(i)
 
         # Initialization Done
         self.root = root
@@ -91,7 +100,7 @@ class MyData(data.Dataset):
         self.labels = labels
         self.classes = classes
         self.transform = transform
-        self.Index = Index
+        self.label_to_indices = label_to_indices
         self.loader = loader
         self.triplet = triplet
 
@@ -102,6 +111,9 @@ class MyData(data.Dataset):
         if self.transform is not None:
             img = self.transform(img)
         return img, label
+
+    def __len__(self):
+        return len(self.images)
 
     # if self.triplet == False:
     #     fn, label = self.images[index], self.labels[index]
@@ -136,9 +148,6 @@ class MyData(data.Dataset):
     #         return self.transform(anchor_img), self.transform(pos_img), self.transform(neg_img)
     #     return anchor_img, pos_img, neg_img
 
-    def __len__(self):
-        return len(self.images)
-
 
 # Example of using this class
 # data = CUB_200_2011(root = path_of_my_data)
@@ -147,21 +156,19 @@ class MyData(data.Dataset):
 #         sampler=some_sampler,
 #         drop_last=True, pin_memory=True, num_workers=nThreads)
 class CUB_200_2011:
-    def __init__(self, width=224, origin_width=256, ratio=0.16, root=None, transform=None):
+    def __init__(self, root, width=224, origin_width=256, ratio=0.16):
         # Data loading code
         # print('ratio is {}'.format(ratio))
-        transform_Dict = Generate_transform_Dict(origin_width=origin_width, width=width, ratio=ratio)
+        transform_dict = generate_transform_dict(origin_width=origin_width, width=width, ratio=ratio)
 
         # root should be the directory with images and train.txt, text.txt
         # example of train.txt can be found at datasets/example
-        if root is None:
-            root = "/Users/Mike/Desktop/EECS498/Project/data/CUB_200_2011"
 
         train_txt = os.path.join(root, 'train.txt')
         test_txt = os.path.join(root, 'test.txt')
 
-        self.train = MyData(root, label_txt=train_txt, transform=transform_Dict['rand-crop'])
-        self.test = MyData(root, label_txt=test_txt, transform=transform_Dict['center-crop'], triplet=False)
+        self.train = MyData(root, label_txt=train_txt, transform=transform_dict['rand-crop'])
+        self.test = MyData(root, label_txt=test_txt, transform=transform_dict['center-crop'], triplet=False)
 
 
 # Example of using this class
@@ -171,68 +178,54 @@ class CUB_200_2011:
 #         sampler=some_sampler,
 #         drop_last=True, pin_memory=True, num_workers=nThreads)
 class Car196:
-    def __init__(self, root=None, origin_width=256, width=224, ratio=0.16, transform=None):
-        # Data loading code
-
-        if transform is None:
-            transform_Dict = Generate_transform_Dict(origin_width=origin_width, width=width, ratio=ratio)
+    def __init__(self, root, origin_width=256, width=224, ratio=0.16):
+        transform_dict = generate_transform_dict(origin_width=origin_width, width=width, ratio=ratio)
 
         # root should be the directory with images and train.txt, text.txt
         # example of train.txt can be found at datasets/example
-        if root is None:
-            root = '/Users/Mike/Desktop/EECS498/Project/data/car196'
 
         train_txt = os.path.join(root, 'train.txt')
         test_txt = os.path.join(root, 'test.txt')
-        self.train = MyData(root, label_txt=train_txt, transform=transform_Dict['rand-crop'])
-        self.test = MyData(root, label_txt=test_txt, transform=transform_Dict['center-crop'], triplet=False)
+        self.train = MyData(root, label_txt=train_txt, transform=transform_dict['rand-crop'])
+        self.test = MyData(root, label_txt=test_txt, transform=transform_dict['center-crop'], triplet=False)
 
 
-def testCar196():
-    data = Car196()
-    print(len(data.test))
-    print(len(data.train))
-    print(data.train[1])
-
-
-def testCUB_200_2011():
-    print(CUB_200_2011.__name__)
-    data = CUB_200_2011()
-    print(len(data.test))
-    print(len(data.train))
-    print(data.train[1])
+# def testCar196():
+#     data = Car196()
+#     print(len(data.test))
+#     print(len(data.train))
+#     print(data.train[1])
+#
+#
+# def testCUB_200_2011():
+#     print(CUB_200_2011.__name__)
+#     data = CUB_200_2011()
+#     print(len(data.test))
+#     print(len(data.train))
+#     print(data.train[1])
 
 
 # loader = torch.utils.data.DataLoader(my_data.train, batch_sampler=sampler)
-class BalancedBatchSampler(data.BatchSampler):
+class BalancedBatchSampler:
     """
     Returns batches of size n_classes * n_samples
     """
+    def __init__(self, label_to_indices, n_classes, n_samples):
+        self.label_to_indices = label_to_indices
+        for label in self.label_to_indices:
+            np.random.shuffle(self.label_to_indices[label])
 
-    def __init__(self, labels, n_classes, n_samples):
-        self.labels = labels
-        self.labels_set = list(set(self.labels))
-        self.label_to_indices = {}
-        for l in self.labels_set:
-            self.label_to_indices[l] = []
-        for i in range(len(labels)):
-            l = labels[i]
-            self.label_to_indices[l].append(i)
-
-        for l in self.labels_set:
-            np.random.shuffle(self.label_to_indices[l])
-        self.used_label_indices_count = {label: 0 for label in self.labels_set}
+        self.used_label_indices_count = defaultdict(int)
         self.count = 0
         self.n_classes = n_classes
         self.n_samples = n_samples
-        self.n_dataset = len(self.labels)
+        self.n_dataset = sum((len(x) for x in self.label_to_indices.values()))
         self.batch_size = self.n_samples * self.n_classes
 
     def __iter__(self):
         self.count = 0
         while self.count + self.batch_size < self.n_dataset:
-
-            classes = np.random.choice(self.labels_set, self.n_classes, replace=False)
+            classes = np.random.choice(list(self.label_to_indices.keys()), self.n_classes, replace=False)
             indices = []
             for class_ in classes:
                 pair = self.label_to_indices[class_][
@@ -253,29 +246,20 @@ class BalancedBatchSampler(data.BatchSampler):
 
 def generate_random_triplets_from_batch(batch, n_samples, n_class):
     # batch [batch_size,3,244,244]
-    batch_size = batch[0].shape[0]
-    image_clusters = batch[0].split(n_samples)
+    images, labels = batch
+    image_clusters = torch.chunk(images, n_class)  # tuple
+    # unique_labels = torch.unique(torch.stack(torch.chunk(labels, n_class)), dim=1).reshape(-1)
+
     triplets = []
-    for i in range(len(image_clusters)):
-        anchor_positives = list(combinations(image_clusters[i], 2))
-        n_idx = np.random.randint(n_class)
-        while n_idx == i:
-            n_idx = np.random.randint(n_class)
-        negs = image_clusters[n_idx]
-        for anchor_positive in anchor_positives:
-            r_index = np.random.randint(n_samples)
-            triplets.append(anchor_positive + (negs[r_index],))
+    for index, images in enumerate(image_clusters):
+        for anc_pos_pair in combinations(images, 2):
+            neg_class = np.random.randint(n_class)
+            while neg_class == index:
+                neg_class = np.random.randint(n_class)
+            neg_idx = np.random.randint(n_samples)
+            triplets.append(anc_pos_pair + (image_clusters[neg_class][neg_idx],))
 
-    anc = []
-    pos = []
-    neg = []
-    for triplet in triplets:
-        anc.append(triplet[0])
-        pos.append(triplet[1])
-        neg.append(triplet[2])
+    triplet_batch = list(zip(*triplets))
 
-    anc_tensor = torch.stack(anc, 0)
-    pos_tensor = torch.stack(pos, 0)
-    neg_tensor = torch.stack(neg, 0)
-
-    return anc_tensor, pos_tensor, neg_tensor
+    anchors, positives, negtives = tuple(map(torch.stack, triplet_batch))  # torch.Size([980, 3, 224, 224])
+    return anchors, positives, negtives

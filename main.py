@@ -17,10 +17,16 @@ def main():
         distance_type='euclidean',
         dataset='car196',
         l2_weight_decay=1e-4,
-        alpha=10.0,
-        learning_rate=1e-4
+        alpha=1,
+        learning_rate=1e-3,
+        n_classes=98,
+        neg_gen_epoch=0,
+        model_save_path="/mnt/tmp/data/models"
     )
-    train(lossfun_one_batch, static_params, '/disk-main/car196')
+    # train(lossfun_one_batch, static_params, '/disk-main/car196', "/disk-main/logs/")
+    data_path = '/mnt/tmp/data/car196'
+    log_path = "/mnt/tmp/data/logs/"
+    train(lossfun_one_batch, static_params, data_path, log_path)
 
 
 if __name__ == '__main__':
