@@ -42,11 +42,11 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
     # construct the model
     model = ModifiedGoogLeNet(p.out_dim, p.normalize_output).to(device)
     model_gen = Generator(p.out_dim, p.normalize_output).to(device)
-    model_dis = Discriminator(p.out_dim, p.out_dim, p.normalize_output).to(device)
+    model_dis = Discriminator(p.out_dim, p.out_dim).to(device)
 
-    model_optimizer = optim.Adam(model.parameters(), lr=p.learning_rate, weight_decay=p.l2_weight_decay)
+    model_optimizer = optim.Adam(model.parameters(), lr=p.learning_rate)
     gen_optimizer = optim.Adam(model_gen.parameters(), lr=p.learning_rate)
-    dis_optimizer = optim.Adam(model_dis.parameters(), lr=p.learning_rate, weight_decay=p.l2_weight_decay)
+    dis_optimizer = optim.Adam(model_dis.parameters(), lr=p.learning_rate)
     model_feat_optimizer = optim.Adam(model.parameters(), lr=p.learning_rate)
 
     time_origin = time.time()
@@ -62,11 +62,15 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
         total = 0
         for batch in tqdm(train_loader, desc='# {}'.format(epoch)):
             triplet_batch = generate_random_triplets_from_batch(batch, n_samples=p.n_samples, n_class=p.n_classes)
-            loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
-                                                      model_optimizer, model_feat_optimizer, gen_optimizer,
-                                                      dis_optimizer, p, triplet_batch,
-                                                      epoch)
-            epoch_loss_gen += loss_gen
+            # loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
+            #                                           model_optimizer, model_feat_optimizer, gen_optimizer,
+            #                                           dis_optimizer, p, triplet_batch,
+            #                                           epoch)
+            loss_dis = func_train_one_batch(device, model, model_dis,
+                                            model_optimizer,
+                                            dis_optimizer, p, triplet_batch)
+
+            # epoch_loss_gen += loss_gen
             epoch_loss_dis += loss_dis
             total += triplet_batch[0].size(0)
 
@@ -84,11 +88,8 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
         if nmi > best_nmi_1:
             best_nmi_1 = nmi
             best_f1_1 = f1
-            # torch.save(model, "/disk-main/models/model.pt")
             torch.save(model, os.path.join(p.model_save_path, "model.pt"))
-            # torch.save(model_gen, '/disk-main/models/model_gen.pt')
             torch.save(model_gen, os.path.join(p.model_save_path, "model_gen.pt"))
-            # torch.save(model_dis, '/disk-main/models/model_dis.pt')
             torch.save(model_dis, os.path.join(p.model_save_path, "model_dis.pt"))
         if f1 > best_f1_2:
             best_nmi_2 = nmi

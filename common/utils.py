@@ -260,6 +260,46 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt,
     return total_loss_gen, total_loss_m
 
 
+def lossfun_one_batch_baseline(device, model, dis_model, opt,
+                               opt_dis, params, batch):
+    # the first half of a batch are the anchors and the latters
+    # are the positive examples corresponding to each anchor
+
+    model.train()
+    dis_model.train()
+
+    ancs, poss, negs = batch
+    ancs = ancs.split(params.batch_size, dim=0)
+    poss = poss.split(params.batch_size, dim=0)
+    negs = negs.split(params.batch_size, dim=0)
+
+    total_loss_m = 0
+
+    for i in range(len(ancs)):
+        anc = ancs[i].to(device)
+        pos = poss[i].to(device)
+        neg = negs[i].to(device)
+
+        model.zero_grad()
+        dis_model.zero_grad()
+
+        anc_out = model(anc)  # (N, 512)
+        pos_out = model(pos)  # (N, 512)
+        neg_out = model(neg)  # (N, 512)
+
+        # Train dis_model
+        batch_concat = torch.cat((anc_out, pos_out, neg_out), dim=0)
+        embeddings = dis_model(batch_concat)  # (3 * N, 512)
+        loss_m = triplet_loss(embeddings, margin=params.alpha)
+        total_loss_m += loss_m.item() * anc.size(0)
+
+        loss_m.backward()
+        opt.step()
+        opt_dis.step()
+
+    return total_loss_m
+
+
 def evaluate(device, model, dis_model, test_loader,
              epoch, n_classes, distance='euclidean', normalize=False, neg_gen_epoch=0):
     if distance not in ('cosine', 'euclidean'):

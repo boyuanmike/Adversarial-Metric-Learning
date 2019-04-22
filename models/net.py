@@ -31,7 +31,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_dim, out_dim, normalize_output=False):
+    def __init__(self, in_dim, out_dim, normalize_output=True):
         super(Discriminator, self).__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
