@@ -457,9 +457,7 @@ def triplet_loss(y, margin=1.0):
     # return torch.mean(F.relu(torch.norm(a - p, dim=1) ** 2 - torch.norm(a - n) ** 2 + margin))
     return F.triplet_margin_loss(a, p, n, margin=margin)
 
-
 def adv_loss(y, margin=1.0):
     a, p, n = torch.chunk(y, 3, dim=0)
     # return torch.mean(F.relu(torch.norm(a - n, dim=1) ** 2 - torch.norm(a - p) ** 2 - margin))
-    #return torch.mean(F.relu(torch.norm(a - n) - torch.norm(a - p) - margin))
-    return torch.mean(F.relu(torch.norm(a - n, dim=1) - torch.norm(a - p, dim=1) - margin))
+    return torch.mean(F.relu(F.pairwise_distance(a, n) - F.pairwise_distance(a, p) - margin))
