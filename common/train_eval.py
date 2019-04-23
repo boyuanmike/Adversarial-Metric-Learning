@@ -67,10 +67,6 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
                                                       dis_optimizer, p, triplet_batch,
                                                       epoch)
 
-            # loss_dis = func_train_one_batch(device, model, model_dis,
-            #                                 model_optimizer,
-            #                                 dis_optimizer, p, triplet_batch)
-
             epoch_loss_gen += loss_gen
             epoch_loss_dis += loss_dis
             total += triplet_batch[0].size(0)
