@@ -20,16 +20,16 @@ def main():
         alpha=1,
         learning_rate=1e-3,
         n_classes=10,
-        neg_gen_epoch=0,
+        neg_gen_epoch=10,
         model_save_path="/mnt/tmp/data/models"
     )
     # train(lossfun_one_batch, static_params, '/disk-main/car196', "/disk-main/logs/")
     data_path = '/mnt/tmp/data/car196'
     log_path = "/mnt/tmp/data/logs/"
 
-    # train(lossfun_one_batch, static_params, data_path, log_path)
+    train(lossfun_one_batch, static_params, data_path, log_path)
 
-    train(lossfun_one_batch_baseline, static_params, data_path, log_path)
+    # train(lossfun_one_batch_baseline, static_params, data_path, log_path)
 
 
 

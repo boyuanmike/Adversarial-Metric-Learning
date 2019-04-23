@@ -62,15 +62,16 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
         total = 0
         for batch in tqdm(train_loader, desc='# {}'.format(epoch)):
             triplet_batch = generate_random_triplets_from_batch(batch, n_samples=p.n_samples, n_class=p.n_classes)
-            # loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
-            #                                           model_optimizer, model_feat_optimizer, gen_optimizer,
-            #                                           dis_optimizer, p, triplet_batch,
-            #                                           epoch)
-            loss_dis = func_train_one_batch(device, model, model_dis,
-                                            model_optimizer,
-                                            dis_optimizer, p, triplet_batch)
+            loss_gen, loss_dis = func_train_one_batch(device, model, model_gen, model_dis,
+                                                      model_optimizer, model_feat_optimizer, gen_optimizer,
+                                                      dis_optimizer, p, triplet_batch,
+                                                      epoch)
 
-            # epoch_loss_gen += loss_gen
+            # loss_dis = func_train_one_batch(device, model, model_dis,
+            #                                 model_optimizer,
+            #                                 dis_optimizer, p, triplet_batch)
+
+            epoch_loss_gen += loss_gen
             epoch_loss_dis += loss_dis
             total += triplet_batch[0].size(0)
 
@@ -109,10 +110,12 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
         print("[test]  nmi:", best_nmi_2, "  f1:", best_f1_2, "for max f1")
         print(p)
 
+    plt.figure(0)
     plt.plot(dis_loss)
     plt.ylabel("dis_loss")
     plt.savefig('dis_loss.png')
 
+    plt.figure(1)
     plt.plot(gen_loss)
     plt.ylabel("gen_loss")
     plt.savefig('gen_loss.png')

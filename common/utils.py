@@ -231,7 +231,7 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt,
         total_loss_m += loss_m.item() * anc.size(0)
 
         loss_m.backward()
-        opt.step()
+        # opt.step()
         opt_dis.step()
 
         model.zero_grad()
@@ -248,8 +248,9 @@ def lossfun_one_batch(device, model, gen_model, dis_model, opt,
         batch_fake = torch.cat((anc_out, pos_out, fake), dim=0)
         embedding_fake = dis_model(batch_fake)  # (3 * N, 512)
 
-        loss_hard = torch.mean(torch.norm(fake - anc_out, dim=1))
-        loss_reg = torch.mean(torch.norm(fake - neg_out, dim=1))
+        loss_hard = torch.mean(F.pairwise_distance(fake, pos_out))
+        loss_reg = torch.mean(F.pairwise_distance(fake, neg_out))
+
         loss_adv = adv_loss(embedding_fake, margin=params.alpha)
         loss_gen = loss_hard + lambda1 * loss_reg + lambda2 * loss_adv
         total_loss_gen += loss_gen.item() * anc.size(0)
@@ -323,4 +324,4 @@ def triplet_loss(y, margin=1.0):
 def adv_loss(y, margin=1.0):
     a, p, n = torch.chunk(y, 3, dim=0)
     # return torch.mean(F.relu(torch.norm(a - n, dim=1) ** 2 - torch.norm(a - p) ** 2 - margin))
-    return torch.mean(F.relu(torch.norm(a - n) - torch.norm(a - p) - margin))
+    return torch.mean(F.relu(F.pairwise_distance(a, n) - F.pairwise_distance(a, p) - margin))
