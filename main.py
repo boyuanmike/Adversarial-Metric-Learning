@@ -13,14 +13,15 @@ def main():
         batch_size=64,
         out_dim=512,
         crop_size=224,
-        normalize_output=False,
+        normalize_output=True,
+        normalize_hidden=False,
         distance_type='euclidean',
         dataset='car196',
         l2_weight_decay=1e-4,
         alpha=1,
         learning_rate=1e-3,
         n_classes=10,
-        neg_gen_epoch=10,
+        neg_gen_epoch=0,
         model_save_path="/mnt/tmp/data/models"
     )
     # train(lossfun_one_batch, static_params, '/disk-main/car196', "/disk-main/logs/")

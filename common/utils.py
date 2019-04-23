@@ -122,7 +122,7 @@ class Logger(defaultdict):
 
 
 def iterate_forward(device, model, dis_model, test_loader,
-                    epoch, normalize=False, neg_gen_epoch=0):
+                    epoch, normalize=True, neg_gen_epoch=0):
     y_batches = []
     c_batches = []
     for anchors, labels in tqdm(test_loader):
@@ -302,7 +302,7 @@ def lossfun_one_batch_baseline(device, model, dis_model, opt,
 
 
 def evaluate(device, model, dis_model, test_loader,
-             epoch, n_classes, distance='euclidean', normalize=False, neg_gen_epoch=0):
+             epoch, n_classes, distance='euclidean', normalize=True, neg_gen_epoch=0):
     if distance not in ('cosine', 'euclidean'):
         raise ValueError("distance must be 'euclidean' or 'cosine'.")
     model.eval()

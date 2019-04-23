@@ -15,9 +15,6 @@ import os
 
 
 def train(func_train_one_batch, param_dict, path, log_dir_path):
-    dis_loss = []
-    gen_loss = []
-
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     p = Logger(log_dir_path, **param_dict)
@@ -40,9 +37,9 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
     test_loader = DataLoader(data.test, batch_size=p.batch_size)
 
     # construct the model
-    model = ModifiedGoogLeNet(p.out_dim, p.normalize_output).to(device)
-    model_gen = Generator(p.out_dim, p.normalize_output).to(device)
-    model_dis = Discriminator(p.out_dim, p.out_dim).to(device)
+    model = ModifiedGoogLeNet(p.out_dim, p.normalize_hidden).to(device)
+    model_gen = Generator(p.out_dim, p.normalize_hidden).to(device)
+    model_dis = Discriminator(p.out_dim, p.out_dim, p.normalize_output).to(device)
 
     model_optimizer = optim.Adam(model.parameters(), lr=p.learning_rate)
     gen_optimizer = optim.Adam(model_gen.parameters(), lr=p.learning_rate)
@@ -54,6 +51,9 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
     best_f1_1 = 0.
     best_nmi_2 = 0.
     best_f1_2 = 0.
+
+    dis_loss = []
+    gen_loss = []
 
     for epoch in range(p.num_epochs):
         time_begin = time.time()
