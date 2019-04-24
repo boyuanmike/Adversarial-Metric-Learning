@@ -38,7 +38,7 @@ def generate_transform_dict(origin_width=256, width=224, ratio=0.16):
             transforms.RandomResizedCrop(scale=(ratio, 1), size=width),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            normalize,
+            # normalize,
         ])
 
     transform_dict['center-crop'] = \
@@ -47,7 +47,7 @@ def generate_transform_dict(origin_width=256, width=224, ratio=0.16):
             transforms.Resize(origin_width),
             transforms.CenterCrop(width),
             transforms.ToTensor(),
-            normalize,
+            # normalize,
         ])
 
     transform_dict['resize'] = \
@@ -56,7 +56,7 @@ def generate_transform_dict(origin_width=256, width=224, ratio=0.16):
             transforms.Resize(width),
             transforms.CenterCrop(width),
             transforms.ToTensor(),
-            normalize,
+            # normalize,
         ])
     return transform_dict
 
@@ -244,7 +244,7 @@ class BalancedBatchSampler:
         return self.n_dataset // self.batch_size
 
 
-def generate_random_triplets_from_batch(batch, n_samples, n_class):
+def gen_triplets_from_batch(batch, n_samples, n_class):
     # batch [batch_size,3,244,244]
     images, labels = batch
     image_clusters = torch.chunk(images, n_class)  # tuple
