@@ -21,7 +21,7 @@ def main():
         learning_rate=1e-3,
         n_classes=10,
         model_save_path="/disk-main/tmp/models",
-        epsilon=5e-3
+        epsilon=1e-2
     )
     # train(lossfun_one_batch, static_params, '/disk-main/car196', "/disk-main/logs/")
     data_path = '/disk-main/data/car196'

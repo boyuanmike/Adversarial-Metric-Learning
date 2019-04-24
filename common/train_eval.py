@@ -43,10 +43,15 @@ def train(train_one_batch, param_dict, path, log_dir_path):
     model_b_opt = optim.Adam(model_b.parameters(), lr=p.learning_rate)
 
     time_origin = time.time()
-    best_nmi_1 = 0.
-    best_f1_1 = 0.
-    best_nmi_2 = 0.
-    best_f1_2 = 0.
+    model_a_best_nmi_1 = 0.
+    model_a_best_f1_1 = 0.
+    model_a_best_nmi_2 = 0.
+    model_a_best_f1_2 = 0.
+
+    model_b_best_nmi_1 = 0.
+    model_b_best_f1_1 = 0.
+    model_b_best_nmi_2 = 0.
+    model_b_best_f1_2 = 0.
 
     total_adv_loss = []
     total_stu_loss = []
@@ -82,16 +87,29 @@ def train(train_one_batch, param_dict, path, log_dir_path):
         total_adv_loss.append(average_adv_loss)
         total_stu_loss.append(average_stu_loss)
 
-        nmi, f1 = evaluate(device, model_a, test_loader,
-                           n_classes=p.n_classes,
-                           normalize=p.normalize_output)
-        if nmi > best_nmi_1:
-            best_nmi_1 = nmi
-            best_f1_1 = f1
+        model_a_nmi, model_a_f1 = evaluate(device, model_a, test_loader,
+                                           n_classes=p.n_classes,
+                                           normalize=p.normalize_output)
+
+        model_b_nmi, model_b_f1 = evaluate(device, model_b, test_loader,
+                                           n_classes=p.n_classes,
+                                           normalize=p.normalize_output)
+
+        if model_a_nmi > model_a_best_nmi_1:
+            model_a_best_nmi_1 = model_a_nmi
+            model_a_best_f1_1 = model_a_f1
             torch.save(model_a, os.path.join(p.model_save_path, "model_a.pt"))
-        if f1 > best_f1_2:
-            best_nmi_2 = nmi
-            best_f1_2 = f1
+        if model_a_f1 > model_a_best_f1_2:
+            model_a_best_nmi_2 = model_a_nmi
+            model_a_best_f1_2 = model_a_f1
+
+        if model_b_nmi > model_b_best_nmi_1:
+            model_b_best_nmi_1 = model_b_nmi
+            model_b_best_f1_1 = model_b_f1
+            torch.save(model_a, os.path.join(p.model_save_path, "model_b.pt"))
+        if model_b_f1 > model_b_best_f1_2:
+            model_b_best_nmi_2 = model_b_nmi
+            model_b_best_f1_2 = model_b_f1
 
         time_end = time.time()
         epoch_time = time_end - time_begin
@@ -99,12 +117,19 @@ def train(train_one_batch, param_dict, path, log_dir_path):
 
         print("#", epoch)
         print("time: {} ({})".format(epoch_time, total_time))
-        print("[train] loss gen:", average_adv_loss)
-        print("[train] loss dis:", average_stu_loss)
-        print("[test]  nmi:", nmi)
-        print("[test]  f1:", f1)
-        print("[test]  nmi:", best_nmi_1, "  f1:", best_f1_1, "for max nmi")
-        print("[test]  nmi:", best_nmi_2, "  f1:", best_f1_2, "for max f1")
+        print("[train] loss adv:", average_adv_loss)
+        print("[train] loss stu:", average_stu_loss)
+
+        print("[test]  model A nmi:", model_a_nmi)
+        print("[test]  model A f1:", model_a_f1)
+        print("[test]  nmi:", model_a_best_nmi_1, "  f1:", model_a_best_f1_1, "for model A max nmi")
+        print("[test]  nmi:", model_a_best_nmi_2, "  f1:", model_a_best_f1_2, "for model A max f1")
+
+        print("[test]  model B nmi:", model_b_nmi)
+        print("[test]  model B f1:", model_b_f1)
+        print("[test]  nmi:", model_b_best_nmi_1, "  f1:", model_b_best_f1_1, "for model B max nmi")
+        print("[test]  nmi:", model_b_best_nmi_2, "  f1:", model_b_best_f1_2, "for model B max f1")
+
         print(p)
 
     plt.figure(0)
