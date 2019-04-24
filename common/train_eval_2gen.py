@@ -45,9 +45,9 @@ def train(func_train_one_batch, param_dict, path, log_dir_path):
     # construct the model
     model = ModifiedGoogLeNet(p.out_dim, p.normalize_hidden).to(device)
     model_pos_gen = Generator(p.out_dim, p.normalize_hidden).to(device)
-    model_neg_gen = Generator(p.out_dim, p.normalize_hidden).to(device)
+    model_neg_gen = Generator(p.out_dim, p.normalize_output).to(device)
 
-    model_dis = Discriminator(p.out_dim, p.out_dim, p.normalize_output).to(device)
+    model_dis = Discriminator(p.out_dim, p.out_dim).to(device)
 
     model_optimizer = optim.Adam(model.parameters(), lr=p.learning_rate)
     pos_gen_optimizer = optim.Adam(model_pos_gen.parameters(), lr=p.learning_rate)
