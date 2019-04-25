@@ -24,12 +24,10 @@ def main():
         epsilon=1e-2
     )
     # train(lossfun_one_batch, static_params, '/disk-main/car196', "/disk-main/logs/")
-    data_path = '/disk-main/data/car196'
+    data_path = '/disk-main/car196'
     log_path = "/disk-main/tmp/logs/"
 
     train(lossfun_one_batch_adversarial, static_params, data_path, log_path)
-
-    # train(lossfun_one_batch_baseline, static_params, data_path, log_path)
 
 
 if __name__ == '__main__':

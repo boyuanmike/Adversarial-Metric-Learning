@@ -39,6 +39,9 @@ def train(train_one_batch, param_dict, path, log_dir_path):
     model_a = ModifiedGoogLeNet(p.out_dim, p.normalize_output).to(device)
     model_b = ModifiedGoogLeNet(p.out_dim, p.normalize_output).to(device)
 
+    # model_a = torch.load(os.path.join(p.model_save_path, "model_a.pt"))
+    # model_b = torch.load(os.path.join(p.model_save_path, "model_b.pt"))
+
     model_a_opt = optim.Adam(model_a.parameters(), lr=p.learning_rate)
     model_b_opt = optim.Adam(model_b.parameters(), lr=p.learning_rate)
 
@@ -141,11 +144,3 @@ def train(train_one_batch, param_dict, path, log_dir_path):
     plt.plot(total_stu_loss)
     plt.ylabel("stu_loss")
     plt.savefig('stu_loss.png')
-
-    # print("total epochs: {} ({} [s])".format(logger.epoch, logger.total_time))
-    # print("best test score (at # {})".format(logger.epoch_best))
-    # print("[test]  soft:", logger.soft_test_best)
-    # print("[test]  hard:", logger.hard_test_best)
-    # print("[test]  retr:", logger.retrieval_test_best)
-    # print(str(p).replace(', ', '\n'))
-    # print()
