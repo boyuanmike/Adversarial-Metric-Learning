@@ -25,14 +25,9 @@ def train(train_one_batch, param_dict, path, log_dir_path):
         data = CUB_200_2011(root=path)
 
     sampler = BalancedBatchSampler(data.train.label_to_indices, n_samples=p.n_samples, n_classes=p.n_classes)
-    kwargs = {'num_workers': 4, 'pin_memory': True}
+    kwargs = {'num_workers': 1, 'pin_memory': True}
 
     train_loader = DataLoader(data.train, batch_sampler=sampler, **kwargs)  # (5 * 98, 3, 224, 224)
-
-    # train_iter = iter(train_loader)
-    # batch = next(train_iter)
-    # generate_random_triplets_from_batch(batch, p.n_samples, p.n_classes)
-
     test_loader = DataLoader(data.test, batch_size=p.batch_size)
 
     # construct the model

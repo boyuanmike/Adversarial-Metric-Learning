@@ -203,15 +203,12 @@ def lossfun_one_batch_adversarial(device, model_stu, model_adv, model_stu_opt,
         pos_out = model_adv(pos)  # (N, 512)
         neg_out = model_adv(neg)  # (N, 512)
 
-        # adv_loss = F.triplet_margin_loss(anc_out, pos_out, neg_out, margin=params.alpha)
-        # adv_loss = triplet_adv_loss(anc_out, pos_out, neg_out, margin=params.alpha)
-        adv_loss = F.triplet_margin_loss(anc_out, neg_out, pos_out, margin=params.alpha)
+        adv_loss = triplet_adv_loss(anc_out, pos_out, neg_out, margin=params.alpha)
         total_adv_loss += adv_loss.item() * anc.size(0)
         adv_loss.backward()
 
         with torch.no_grad():
             neg = torch.clamp(neg - params.epsilon * torch.sign(neg.grad.data), 0, 1)
-            neg.requires_grad_(False)
 
         model_adv.zero_grad()
 
@@ -237,4 +234,5 @@ def evaluate(device, model, test_loader, n_classes, normalize=True):
 
 
 def triplet_adv_loss(anc, pos, neg, margin=1):
-    return torch.mean(F.relu(F.pairwise_distance(anc, neg) - F.pairwise_distance(anc, pos) - margin))
+    return torch.mean(F.relu(F.pairwise_distance(anc, neg)
+                             - F.pairwise_distance(anc, pos) - margin))

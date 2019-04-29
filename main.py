@@ -20,12 +20,12 @@ def main():
         alpha=1,
         learning_rate=1e-3,
         n_classes=10,
-        model_save_path="/disk-main/tmp/models",
+        model_save_path="./saved_models",
         epsilon=1e-2
     )
-    # train(lossfun_one_batch, static_params, '/disk-main/car196', "/disk-main/logs/")
-    data_path = '/disk-main/car196'
-    log_path = "/disk-main/tmp/logs/"
+
+    data_path = './car196'
+    log_path = "./logs/"
 
     train(lossfun_one_batch_adversarial, static_params, data_path, log_path)
 
