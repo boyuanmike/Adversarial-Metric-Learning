@@ -24,7 +24,7 @@ def main():
         epsilon=1e-2
     )
 
-    data_path = './car196'
+    data_path = '../car196'
     log_path = "./logs/"
 
     train(lossfun_one_batch_adversarial, static_params, data_path, log_path)
